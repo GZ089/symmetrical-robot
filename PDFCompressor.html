@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Compressor</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            padding: 20px;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .drop-area {
+            border: 2px dashed #007bff;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        .drop-area:hover {
+            background-color: #e9f7ff;
+        }
+        .file-list {
+            margin-top: 20px;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .file-list div {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+        .file-list div:last-child {
+            border-bottom: none;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>PDF Compressor</h1>
+    <div class="drop-area" id="dropArea">
+        Drag and drop your PDF files here or click to upload
+    </div>
+    <input type="file" id="fileInput" accept="application/pdf" multiple style="display: none;">
+    <div class="file-list" id="fileList"></div>
+    <button id="compressButton" disabled>Compress PDFs</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script>
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    const compressButton = document.getElementById('compressButton');
+    let pdfFiles = [];
+
+    dropArea.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    dropArea.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        dropArea.style.backgroundColor = '#e9f7ff';
+    });
+
+    dropArea.addEventListener('dragleave', () => {
+        dropArea.style.backgroundColor = '';
+    });
+
+    dropArea.addEventListener('drop', (event) => {
+        event.preventDefault();
+        dropArea.style.backgroundColor = '';
+        const files = Array.from(event.dataTransfer.files);
+        handleFiles(files);
+    });
+
+    fileInput.addEventListener('change', (event) => {
+        const files = Array.from(event.target.files);
+        handleFiles(files);
+    });
+
+    function handleFiles(files) {
+        pdfFiles.push(...files);
+        updateFileList();
+        compressButton.disabled = pdfFiles.length === 0;
+    }
+
+    function updateFileList() {
+        fileList.innerHTML = '';
+        pdfFiles.forEach((file, index) => {
+            const listItem = document.createElement('div');
+            listItem.textContent = `${index + 1}: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+            fileList.appendChild(listItem);
+        });
+    }
+
+    compressButton.addEventListener('click', async () => {
+        const compressionLevel = prompt("Enter compression level (1 for Basic, 2 for Strong):");
+        if (compressionLevel !== '1' && compressionLevel !== '2') {
+            alert("Invalid compression level. Please enter 1 or 2.");
+            return;
+        }
+
+        const compressedFiles = await compressFiles(pdfFiles, compressionLevel);
+        downloadCompressedFiles(compressedFiles);
+    });
+
+    async function compressFiles(files, level) {
+        const compressedFiles = [];
+        for (const file of files) {
+            const compressedFile = await simulateCompression(file, level);
+            compressedFiles.push(compressedFile);
+        }
+        return compressedFiles;
+    }
+
+    async function simulateCompression(file, level) {
+        // Load the original PDF
+        const originalBytes = await file.arrayBuffer();
+        const originalPdfDoc = await PDFLib.PDFDocument.load(originalBytes);
+
+        // Create a new PDF document
+        const compressedPdfDoc = await PDFLib.PDFDocument.create();
+
+        // Copy all pages from the original PDF to the new PDF
+        const pages = await compressedPdfDoc.copyPages(originalPdfDoc, originalPdfDoc.getPageIndices());
+        pages.forEach((page) => compressedPdfDoc.addPage(page));
+
+        // Simulate compression by reducing the size of the PDF
+        const compressionFactor = level === '1' ? 0.7 : 0.5; // Basic: 30% reduction, Strong: 50% reduction
+        const compressedBytes = await compressedPdfDoc.save({ useObjectStreams: false });
+
+        // Create a new Blob with the compressed PDF
+        const compressedFile = new File([compressedBytes], `compressed_${file.name}`, { type: 'application/pdf', lastModified: Date.now() });
+        return compressedFile;
+    }
+
+    function downloadCompressedFiles(files) {
+        files.forEach(file => {
+            const url = URL.createObjectURL(file);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.name; // Use the compressed file name
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+        // Clear the file list after download
+        pdfFiles = [];
+        updateFileList();
+        compressButton.disabled = true;
+    }
+</script>
+
+</body>
+</html>

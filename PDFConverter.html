@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word to PDF Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #toolbar {
+            margin-bottom: 10px;
+        }
+        button {
+            margin-right: 5px;
+        }
+        #editor {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            font-size: 16px;
+        }
+        #editor[contenteditable="true"]:focus {
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Word to PDF Converter</h1>
+<div id="toolbar">
+    <button onclick="formatText('bold')">Bold</button>
+    <button onclick="formatText('italic')">Italic</button>
+    <button onclick="formatText('underline')">Underline</button>
+    <button onclick="formatText('strikeThrough')">Strikethrough</button>
+    <select id="fontFamily" onchange="changeFontFamily(this.value)">
+        <option value="Arial">Arial</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Verdana">Verdana</option>
+    </select>
+    <select id="fontSize" onchange="changeFontSize(this.value)">
+        <option value="2">Small</option>
+        <option value="3">Normal</option>
+        <option value="4">Large</option>
+        <option value="5">Extra Large</option>
+    </select>
+    <input type="color" id="textColor" onchange="changeTextColor(this.value)" title="Text Color">
+    <input type="color" id="bgColor" onchange="changeBackgroundColor(this.value)" title="Background Color">
+    <button onclick="insertImage()">Insert Image</button>
+    <input type="file" id="fileInput" accept="image/*" onchange="uploadImage()" style="display:none;">
+    <button onclick="document.getElementById('fileInput').click();">Upload Image</button>
+    <button onclick="convertToPDF()">Convert to PDF</button>
+</div>
+<div id="editor" contenteditable="true" placeholder="Type your content here..."></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+    function formatText(command) {
+        document.execCommand(command, false, null);
+    }
+
+    function changeFontFamily(value) {
+        document.execCommand('fontName', false, value);
+    }
+
+    function changeFontSize(value) {
+        document.execCommand('fontSize', false, value);
+    }
+
+    function changeTextColor(value) {
+        document.execCommand('foreColor', false, value);
+    }
+
+    function changeBackgroundColor(value) {
+        document.execCommand('backColor', false, value);
+    }
+
+    function insertImage() {
+        const url = prompt("Enter image URL:");
+        if (url) {
+            const img = document.createElement("img");
+            img.src = url;
+            img.style.maxWidth = "100%";
+            document.getElementById("editor").appendChild(img);
+        }
+    }
+
+    function uploadImage() {
+        const file = document.getElementById('fileInput').files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.createElement("img");
+            img.src = e.target.result;
+            img.style.maxWidth = "100%";
+            document.getElementById("editor").appendChild(img);
+        }
+        reader.readAsDataURL(file);
+    }
+
+    function convertToPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const content = document.getElementById('editor').innerHTML;
+
+        // Use html method to convert HTML content to PDF
+        doc.html(content, {
+            callback: function (doc) {
+                doc.save('converted.pdf'); // Save the PDF
+            },
+            x: 10,
+            y: 10
+        });
+    }
+</script>
+
+
+
+</body>
+</html>

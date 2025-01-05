@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Splitter and Editor</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            padding: 20px;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+        .container:hover {
+            transform: scale(1.02);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        input[type="file"] {
+            display: none; /* Hide the default file input */
+        }
+        .file-input-label {
+            display: inline-block;
+            padding: 10px 2px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            transition: background-color 0.3s;
+            width: 100%;
+            text-decoration: none;
+            margin-top: 10px;
+        }
+        .file-input-label:hover {
+            background-color: #0056b3;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s, transform 0.3s;
+        }
+        button:disabled {
+            background-color: #ccc;
+        }
+        button:hover:not(:disabled) {
+            background-color: #218838;
+            transform: scale(1.05);
+        }
+        .file-list {
+            margin-top: 20px;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .file-list div {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-list div:last-child {
+            border-bottom: none;
+        }
+        .delete-button {
+            background-color: #dc3545;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .delete-button:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>PDF Splitter and Editor</h1>
+    <label for="fileInput" class="file-input-label">Choose PDF File</label>
+    <input type="file" id="fileInput" accept="application/pdf">
+    <button id="splitButton" disabled>Split PDF</button>
+    <div class="file-list" id="fileList"></div>
+    <button id="downloadButton" style="display: none;">Download Modified PDF</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const splitButton = document.getElementById('splitButton');
+    const fileList = document.getElementById('fileList');
+    const downloadButton = document.getElementById('downloadButton');
+    let pdfFile;
+    let splitPages = [];
+
+    fileInput.addEventListener('change', (event) => {
+        pdfFile = event.target.files[0];
+        if (pdfFile) {
+            updateFileList();
+            splitButton.disabled = false; // Enable button if a PDF is selected
+        }
+    });
+
+    function updateFileList() {
+        fileList.innerHTML = '';
+        splitPages = []; // Reset the split pages array
+
+        const listItem = document.createElement('div');
+        listItem.textContent = `Selected: ${pdfFile.name}`;
+        fileList.appendChild(listItem);
+    }
+
+    splitButton.addEventListener('click', async () => {
+        const pdfBytes = await pdfFile.arrayBuffer();
+        const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+        const totalPages = pdfDoc.getPageCount();
+        splitPages = []; // Reset the split pages array
+
+        for (let i = 0; i < totalPages; i++) {
+            const newPdfDoc = await PDFLib.PDFDocument.create();
+            const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [i]);
+            newPdfDoc.addPage(copiedPage);
+
+            const pageBytes = await newPdfDoc.save();
+            splitPages.push({ pageNumber: i + 1, pdfBytes: pageBytes });
+        }
+
+        displaySplitPages();
+        downloadButton.style.display = 'block'; // Show download button
+    });
+
+    function displaySplitPages() {
+        fileList.innerHTML = ''; // Clear the list
+        splitPages.forEach((page) => {
+            const listItem = document.createElement('div');
+            listItem.textContent = `Page ${page.pageNumber}`;
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.className = 'delete-button';
+            deleteButton.onclick = () => deletePage(page.pageNumber);
+            listItem.appendChild(deleteButton);
+            fileList.appendChild(listItem);
+        });
+    }
+
+    function deletePage(pageNumber) {
+        splitPages = splitPages.filter(page => page.pageNumber !== pageNumber);
+        displaySplitPages();
+        if (splitPages.length === 0) {
+            downloadButton.style.display = 'none'; // Hide download button if no pages left
+        }
+    }
+
+    downloadButton.addEventListener('click', async () => {
+        const modifiedPdfDoc = await PDFLib.PDFDocument.create();
+        for (const page of splitPages) {
+            const newPdfDoc = await PDFLib.PDFDocument.load(page.pdfBytes);
+            const [copiedPage] = await modifiedPdfDoc.copyPages(newPdfDoc, [0]);
+            modifiedPdfDoc.addPage(copiedPage);
+        }
+        const modifiedPdfBytes = await modifiedPdfDoc.save();
+        downloadModifiedPdf(modifiedPdfBytes);
+    });
+
+    function downloadModifiedPdf(pdfBytes) {
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Modified_PDF.pdf'; // Save the modified PDF with a specific name
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern PDF Editor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(to right, #4facfe, #00f2fe);
+            color: #333;
+        }
+
+        .container {
+            background: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+            animation: fadeIn 1s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            margin: 10px 0;
+        }
+
+        #toolbar {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 15px;
+            background: #4facfe;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #3b9ff3;
+        }
+
+        #pdfViewer {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            height: 500px;
+            overflow: auto;
+            margin: 10px 0;
+        }
+
+        .editor-container {
+            margin-top: 20px;
+        }
+
+        #editor {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            overflow-y: auto;
+            border-radius: 5px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #searchBar {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        #searchInput {
+            width: 60%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        #goToPageBtn {
+            padding: 10px 15px;
+            margin-left: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            #searchInput {
+                width: 80%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Modern PDF Editor</h1>
+        <input type="file" id="fileInput" accept="application/pdf">
+        <div id="toolbar">
+            <button id="editTextBtn">Edit Text</button>
+            <button id="richTextBtn">Open Rich Text Editor</button>
+            <button id="savePdfBtn">Save PDF</button>
+        </div>
+
+        <div id="searchBar" class="hidden">
+            <input type="number" id="searchInput" placeholder="Enter page number...">
+            <button id="goToPageBtn">Go to Page</button>
+        </div>
+
+        <div id="pdfViewer" class="hidden">
+            <canvas></canvas>
+        </div>
+
+        <div class="editor-container hidden" id="editorContainer">
+            <h3>Rich Text Editor</h3>
+            <div id="editor" contenteditable="true">
+                <p style="font-size: 16px;">Start editing your content here...</p>
+            </div>
+            <button id="applyChangesBtn">Apply Changes to PDF</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
+    <script>
+        let pdfDoc = null;
+        let pdfBytes = null;
+        let currentPage = 1;
+
+        document.getElementById('fileInput').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const fileReader = new FileReader();
+                fileReader.onload = async function () {
+                    pdfBytes = fileReader.result;
+                    const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+                    pdfDoc = await loadingTask.promise;
+                    document.getElementById('pdfViewer').classList.remove('hidden');
+                    document.getElementById('searchBar').classList.remove('hidden');
+                    renderPage(currentPage);
+                };
+                fileReader.readAsArrayBuffer(file);
+            }
+        });
+
+        async function renderPage(pageNumber) {
+            const pdfViewer = document.getElementById('pdfViewer');
+            pdfViewer.innerHTML = ''; // Clear previous content
+
+            const page = await pdfDoc.getPage(pageNumber);
+            const viewport = page.getViewport({ scale: 1 });
+            const canvas = document.createElement('canvas');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            pdfViewer.appendChild(canvas);
+
+            const context = canvas.getContext('2d');
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport,
+            };
+            await page.render(renderContext).promise;
+        }
+
+        document.getElementById('goToPageBtn').addEventListener('click', () => {
+            const pageInput = parseInt(document.getElementById('searchInput').value);
+            if (pageInput > 0 && pageInput <= pdfDoc.numPages) {
+                currentPage = pageInput;
+                renderPage(currentPage);
+            } else {
+                alert('Invalid page number.');
+            }
+        });
+
+        document.getElementById('editTextBtn').addEventListener('click', () => {
+            alert('This is a simple text editor. For advanced customization, try the Rich Text Editor.');
+        });
+
+        document.getElementById('richTextBtn').addEventListener('click', () => {
+            document.getElementById('editorContainer').classList.remove('hidden');
+        });
+
+        document.getElementById('applyChangesBtn').addEventListener('click', async () => {
+            const editorContent = document.getElementById('editor').innerHTML;
+            const pdfDocModified = await PDFLib.PDFDocument.load(pdfBytes);
+            const page = pdfDocModified.getPage(0);
+
+            page.drawText(stripHtml(editorContent), {
+                x: 50,
+                y: 500,
+                size: 12,
+                color: PDFLib.rgb(0, 0, 0),
+            });
+
+            const modifiedPdfBytes = await pdfDocModified.save();
+            const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'customized.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            alert('Changes applied and PDF saved.');
+        });
+
+        document.getElementById('savePdfBtn').addEventListener('click', async () => {
+            if (!pdfDoc) {
+                alert('Please load a PDF first.');
+                return;
+            }
+
+            const modifiedPdfBytes = await pdfDoc.save();
+            const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'saved.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        function stripHtml(html) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            return tempDiv.textContent || tempDiv.innerText || '';
+        }
+    </script>
+</body>
+
+</html>

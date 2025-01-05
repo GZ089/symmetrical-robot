@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Merger</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            padding: 20px;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+        .container:hover {
+            transform: scale(1.02);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        input[type="file"] {
+            display: none; /* Hide the default file input */
+        }
+        .file-input-label {
+            display: inline-block;
+            padding: 20px 1px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            transition: background-color 0.3s;
+            width: 100%;
+            text-decoration: none;
+            margin-top: 10px;
+        }
+        .file-input-label:hover {
+            background-color: #0056b3;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s, transform 0.3s;
+        }
+        button:disabled {
+            background-color: #ccc;
+        }
+        button:hover:not(:disabled) {
+            background-color: #218838;
+            transform: scale(1.05);
+        }
+        .file-list {
+            margin-top: 20px;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .file-list div {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+        .file-list div:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>PDF Merger</h1>
+    <label for="fileInput" class="file-input-label">Choose PDF Files</label>
+    <input type="file" id="fileInput" multiple accept="application/pdf">
+    <button id="mergeButton" disabled>Merge PDFs</button>
+    <div class="file-list" id="fileList"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const mergeButton = document.getElementById('mergeButton');
+    const fileList = document.getElementById('fileList');
+    let pdfFiles = [];
+
+    fileInput.addEventListener('change', (event) => {
+        pdfFiles = Array.from(event.target.files);
+        updateFileList();
+        mergeButton.disabled = pdfFiles.length < 2; // Enable button if at least 2 PDFs are selected
+    });
+
+    function updateFileList() {
+        fileList.innerHTML = '';
+        pdfFiles.forEach((file, index) => {
+            const listItem = document.createElement('div');
+            listItem.textContent = `${index + 1}: ${file.name}`;
+            fileList.appendChild(listItem);
+        });
+    }
+
+    mergeButton.addEventListener('click', async () => {
+        const mergedPdf = await PDFLib.PDFDocument.create();
+        for (const pdfFile of pdfFiles) {
+            const pdfBytes = await pdfFile.arrayBuffer();
+            const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+            const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+            copiedPages.forEach((page) => mergedPdf.addPage(page));
+        }
+        const mergedPdfFile = await mergedPdf.save();
+        downloadMergedPdf(mergedPdfFile);
+    });
+
+    function downloadMergedPdf(pdfBytes) {
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'GZ_PDF.pdf'; // Save the merged PDF with the name GZ_PDF.pdf
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+</script>
+
+</body>
+</html>
