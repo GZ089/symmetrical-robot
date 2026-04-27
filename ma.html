@@ -1,299 +1,580 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Merchant Admin Panel</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Merchant Admin Panel | Secure Approval & Editable View</title>
 
-  <!-- Firebase (compat) -->
+  <!-- Firebase SDK v9 compat (stable) -->
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 
-  <!-- jsPDF -->
+  <!-- jsPDF for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
-      font-family: Arial;
-      background: #f4f6f9;
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #f0f2f8;
       margin: 0;
-      padding: 20px;
+      padding: 24px 20px;
     }
-
+    .admin-container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
     h2 {
-      margin-bottom: 10px;
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin: 0 0 0.25rem 0;
     }
-
+    .sub {
+      color: #475569;
+      margin-bottom: 1.5rem;
+      border-left: 4px solid #2d89ef;
+      padding-left: 12px;
+    }
     .top-bar {
       display: flex;
-      gap: 10px;
-      margin-bottom: 15px;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+      align-items: center;
+      background: white;
+      padding: 12px 20px;
+      border-radius: 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
-
     button {
-      padding: 8px 12px;
-      border: none;
       background: #2d89ef;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 40px;
+      font-weight: 500;
+      font-size: 0.85rem;
       color: white;
       cursor: pointer;
-      border-radius: 5px;
+      transition: 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
-
-    button:hover {
-      opacity: 0.9;
+    button:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-outline {
+      background: #eef2ff;
+      color: #1e40af;
+      box-shadow: none;
     }
-
-    .danger { background: #e74c3c; }
-    .success { background: #27ae60; }
-
+    .btn-outline:hover { background: #e0e7ff; }
+    .btn-danger { background: #dc2626; }
+    .btn-success { background: #10b981; }
+    .btn-warning { background: #f59e0b; }
     table {
       width: 100%;
-      border-collapse: collapse;
       background: white;
-      border-radius: 8px;
+      border-radius: 20px;
       overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      border-collapse: collapse;
     }
-
-    th, td {
-      padding: 10px;
-      border-bottom: 1px solid #ddd;
-      text-align: left;
-    }
-
     th {
-      background: #2d89ef;
+      background: #1e293b;
       color: white;
+      font-weight: 600;
+      padding: 14px 12px;
+      font-size: 0.85rem;
     }
-
-    tr:hover {
-      background: #f1f1f1;
+    td {
+      padding: 14px 12px;
+      border-bottom: 1px solid #e9eef3;
+      color: #1f2a44;
+      vertical-align: middle;
     }
-
-    /* Modal */
+    tr:hover td { background-color: #fafcff; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .status-approved { background: #d1fae5; color: #065f46; }
+    .status-pending { background: #ffedd5; color: #9a3412; }
+    .action-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .action-group button {
+      padding: 5px 12px;
+      font-size: 0.75rem;
+    }
     .modal {
       display: none;
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6);
+      background-color: rgba(0,0,0,0.6);
+      backdrop-filter: blur(3px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
     }
-
-    .modal-content {
+    .modal-card {
       background: white;
-      padding: 20px;
-      margin: 5% auto;
-      width: 70%;
-      max-height: 80%;
+      width: 90%;
+      max-width: 750px;
+      max-height: 85vh;
+      border-radius: 28px;
       overflow-y: auto;
-      border-radius: 8px;
+      padding: 24px 28px;
+      box-shadow: 0 25px 40px rgba(0,0,0,0.25);
+      animation: fadeSlide 0.2s ease;
     }
-
-    img {
-      margin: 5px;
-      border-radius: 5px;
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .modal-card h3 {
+      margin-top: 0;
+      font-size: 1.6rem;
+      font-weight: 600;
+      border-bottom: 2px solid #eef2ff;
+      padding-bottom: 10px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 20px;
+      margin: 20px 0;
+    }
+    .full-width { grid-column: span 2; }
+    label {
+      font-weight: 600;
+      font-size: 0.8rem;
+      color: #334155;
+      display: block;
+      margin-bottom: 4px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      transition: 0.2s;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #2d89ef;
+      box-shadow: 0 0 0 2px rgba(45,137,239,0.2);
+    }
+    .image-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 12px;
+      align-items: center;
+    }
+    .image-strip img {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 20px;
+      border-top: 1px solid #eef2ff;
+      padding-top: 20px;
+    }
+    .info-text {
+      background: #f8fafc;
+      padding: 10px;
+      border-radius: 16px;
+      font-size: 0.8rem;
+      margin: 10px 0;
+    }
+    @media (max-width: 680px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .full-width { grid-column: span 1; }
+      .top-bar { justify-content: center; }
+      .action-group button { padding: 4px 8px; }
     }
   </style>
 </head>
-
 <body>
+<div class="admin-container">
+  <h2>⚡ Merchant Admin Panel</h2>
+  <div class="sub">Review, edit, approve & manage applications securely</div>
 
-<h2>Merchant Admin Panel</h2>
+  <div class="top-bar">
+    <button onclick="login()">🔐 Google Login</button>
+    <button onclick="logout()" class="btn-outline">🚪 Logout</button>
+    <span style="flex:1"></span>
+    <button onclick="downloadJSON()">📄 JSON</button>
+    <button onclick="downloadCSV()">📊 Excel (CSV)</button>
+    <button onclick="downloadPDF()">📑 PDF</button>
+  </div>
 
-<div class="top-bar">
-  <button onclick="login()">Login</button>
-  <button onclick="logout()">Logout</button>
-  <button onclick="downloadJSON()">JSON</button>
-  <button onclick="downloadCSV()">Excel</button>
-  <button onclick="downloadPDF()">PDF</button>
+  <div style="overflow-x: auto;">
+    <table>
+      <thead>
+        <tr><th>Shop</th><th>Owner</th><th>Email</th><th>Status</th><th style="width:160px">Actions</th></tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="5" style="text-align:center">🔁 Loading applications...</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
-<table>
-  <thead>
-    <tr>
-      <th>Shop</th>
-      <th>Owner</th>
-      <th>Email</th>
-      <th>Status</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody id="tableBody"></tbody>
-</table>
-
-<!-- Modal -->
-<div class="modal" id="modal">
-  <div class="modal-content" id="modalContent"></div>
+<!-- Modal dialog (editable & approve) -->
+<div id="detailsModal" class="modal">
+  <div class="modal-card" id="modalContentInner">
+    <!-- dynamic content injected -->
+  </div>
 </div>
 
 <script>
-  // 🔥 CONFIG HERE
-    // ✅ Firebase Config
-  var firebaseConfig = {
-    apiKey: "AIzaSyB44kAWSIrjWmYH75g16-J_Mnkip-HvNBM",
-    authDomain: "ayshamall.firebaseapp.com",
-    projectId: "ayshamall",
-    storageBucket: "ayshamall.firebasestorage.app",
-    messagingSenderId: "319564197871",
-    appId: "1:319564197871:web:d0de1f012835234494d01a"
+  // ======================== FIREBASE CONFIGURATION ========================
+  // ⚠️ REPLACE WITH YOUR ACTUAL FIREBASE PROJECT CREDENTIALS
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef"
   };
+  const ADMIN_EMAIL = "admin@yourdomain.com";        // <-- SET YOUR ADMIN EMAIL
 
-  const ADMIN_EMAIL = "studywithsirgul44@gmail.com";
-
+  // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
-
   const auth = firebase.auth();
   const db = firebase.firestore();
 
-  let allData = [];
+  let allMerchants = [];       // store all docs with id
 
-  // 🔐 AUTH
-  function login() {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider);
-  }
+  // ======================== AUTH MANAGEMENT ========================
+  window.login = async () => {
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await auth.signInWithPopup(provider);
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("Login failed: " + err.message);
+    }
+  };
 
-  function logout() {
-    auth.signOut();
-  }
+  window.logout = async () => {
+    try {
+      await auth.signOut();
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="5" style="text-align:center">👋 Logged out. Please login.</td></tr>';
+      allMerchants = [];
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+  };
 
-  auth.onAuthStateChanged(user => {
+  auth.onAuthStateChanged(async (user) => {
     if (user) {
       if (user.email !== ADMIN_EMAIL) {
-        alert("Not Authorized");
-        auth.signOut();
+        alert(`⛔ Unauthorized: ${user.email} is not admin.`);
+        await auth.signOut();
+        document.getElementById("tableBody").innerHTML = '<tr><td colspan="5" style="text-align:center">Access denied. Please use admin email.</td></tr>';
         return;
       }
-      loadData();
+      // authorized admin
+      await loadMerchantData();
+    } else {
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="5" style="text-align:center">🔒 Please click "Login" with admin Google account.</td></tr>';
+      allMerchants = [];
     }
   });
 
-  // 📥 LOAD DATA
-  async function loadData() {
-    const snapshot = await db.collection("merchantApplication").get();
-
+  // ======================== LOAD DATA FROM FIRESTORE ========================
+  async function loadMerchantData() {
     const tbody = document.getElementById("tableBody");
-    tbody.innerHTML = "";
-    allData = [];
-
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      data.id = doc.id;
-      allData.push(data);
-
-      const row = document.createElement("tr");
-
-      row.innerHTML = `
-        <td>${data.shopName || ""}</td>
-        <td>${data.ownerName || ""}</td>
-        <td>${data.submitterEmail || ""}</td>
-        <td style="color:${data.status === 'approved' ? 'green' : 'red'}">
-          ${data.status || "pending"}
-        </td>
-        <td>
-          <button onclick="viewDetails('${doc.id}')">View</button>
-          <button class="success" onclick="approve('${doc.id}')">Approve</button>
-          <button class="danger" onclick="deleteDoc('${doc.id}')">Delete</button>
-        </td>
-      `;
-
-      tbody.appendChild(row);
-    });
-  }
-
-  // 👁 VIEW DETAILS
-  function viewDetails(id) {
-    const data = allData.find(d => d.id === id);
-
-    document.getElementById("modal").style.display = "block";
-
-    document.getElementById("modalContent").innerHTML = `
-      <h3>${data.shopName}</h3>
-
-      <b>Shop ID:</b> ${data.shopId}<br>
-      <b>Nature:</b> ${data.shopNature}<br>
-      <b>Platform:</b> ${data.platform}<br>
-      <b>Status:</b> ${data.status}<br>
-      <b>Owner:</b> ${data.ownerName}<br>
-      <b>Phone:</b> ${data.ownerNumber}<br>
-      <b>Email:</b> ${data.submitterEmail}<br>
-      <b>CNIC:</b> ${data.cnic}<br>
-      <b>COD:</b> ${data.isCashOnDelivery}<br>
-      <b>Applied:</b> ${data.appliedAt}<br>
-      <b>Details:</b> ${data.otherDetails}<br>
-
-      <h4>Owner Image</h4>
-      <img src="${data.ownerProfileImage || ""}" width="120"/>
-
-      <h4>Product Images</h4>
-      ${(data.productImages || []).map(i => `<img src="${i}" width="100"/>`).join("")}
-
-      <h4>Policies</h4>
-      <b>Dropshipping:</b> ${data.privacyPolicyForDropshipping}<br>
-      <b>Customers:</b> ${data.privacyPolicyForCustomers}<br>
-
-      <br><br>
-      <button onclick="closeModal()">Close</button>
-    `;
-  }
-
-  function closeModal() {
-    document.getElementById("modal").style.display = "none";
-  }
-
-  // ✅ APPROVE
-  async function approve(id) {
-    await db.collection("merchantApplication").doc(id).update({
-      status: "approved"
-    });
-    loadData();
-  }
-
-  // ❌ DELETE
-  async function deleteDoc(id) {
-    if (confirm("Delete this record?")) {
-      await db.collection("merchantApplication").doc(id).delete();
-      loadData();
+    tbody.innerHTML = '<tr><td colspan="5">⏳ Fetching merchant applications...</td></tr>';
+    try {
+      const snapshot = await db.collection("merchantApplication").get();
+      if (snapshot.empty) {
+        tbody.innerHTML = '<tr><td colspan="5">📭 No merchant applications found.</td></tr>';
+        allMerchants = [];
+        return;
+      }
+      const list = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const record = { id: doc.id, ...data };
+        list.push(record);
+      });
+      allMerchants = list;
+      renderTable(list);
+    } catch (error) {
+      console.error("Firestore load error:", error);
+      alert("Failed to load data: " + error.message);
+      tbody.innerHTML = '<tr><td colspan="5">⚠️ Error loading data. Check console.</td></tr>';
     }
   }
 
-  // 📦 DOWNLOAD JSON
-  function downloadJSON() {
-    const blob = new Blob([JSON.stringify(allData, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "data.json";
-    a.click();
-  }
+  function renderTable(merchants) {
+    const tbody = document.getElementById("tableBody");
+    if (!merchants.length) {
+      tbody.innerHTML = '<tr><td colspan="5">✨ No applications yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = "";
+    merchants.forEach(merchant => {
+      const row = tbody.insertRow();
+      const shopCell = row.insertCell(0);
+      const ownerCell = row.insertCell(1);
+      const emailCell = row.insertCell(2);
+      const statusCell = row.insertCell(3);
+      const actionsCell = row.insertCell(4);
 
-  // 📊 CSV (Excel)
-  function downloadCSV() {
-    let csv = "Shop,Owner,Email,Status\n";
-    allData.forEach(d => {
-      csv += `${d.shopName},${d.ownerName},${d.submitterEmail},${d.status}\n`;
+      shopCell.innerText = merchant.shopName || "—";
+      ownerCell.innerText = merchant.ownerName || "—";
+      emailCell.innerText = merchant.submitterEmail || merchant.email || "—";
+      const status = merchant.status || "pending";
+      statusCell.innerHTML = `<span class="status-badge ${status === 'approved' ? 'status-approved' : 'status-pending'}">${status}</span>`;
+
+      actionsCell.innerHTML = `
+        <div class="action-group">
+          <button onclick="openEditableModal('${merchant.id}')" style="background:#3b82f6;">👁 View/Edit</button>
+          <button onclick="approveApplication('${merchant.id}')" class="btn-success">✅ Approve</button>
+          <button onclick="deleteApplication('${merchant.id}')" class="btn-danger">🗑 Delete</button>
+        </div>
+      `;
     });
-
-    const blob = new Blob([csv], { type: "text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "data.csv";
-    a.click();
   }
 
-  // 📄 PDF
-  function downloadPDF() {
+  // ======================== OPEN MODAL WITH FULL EDITABLE FIELDS ========================
+  window.openEditableModal = (id) => {
+    const merchant = allMerchants.find(m => m.id === id);
+    if (!merchant) {
+      alert("Merchant not found");
+      return;
+    }
+
+    // Helper safe string
+    const safe = (val) => (val === undefined || val === null) ? "" : String(val);
+
+    const modalHtml = `
+      <h3>✏️ Edit & Review — ${safe(merchant.shopName)}</h3>
+      <div class="form-grid">
+        <div>
+          <label>🏪 Shop Name</label>
+          <input type="text" id="edit_shopName" value="${escapeHtml(safe(merchant.shopName))}">
+        </div>
+        <div>
+          <label>👤 Owner Name</label>
+          <input type="text" id="edit_ownerName" value="${escapeHtml(safe(merchant.ownerName))}">
+        </div>
+        <div>
+          <label>📞 Owner Number</label>
+          <input type="text" id="edit_ownerNumber" value="${escapeHtml(safe(merchant.ownerNumber))}">
+        </div>
+        <div>
+          <label>🏷️ Shop Nature</label>
+          <input type="text" id="edit_shopNature" value="${escapeHtml(safe(merchant.shopNature))}">
+        </div>
+        <div>
+          <label>🛒 Platform</label>
+          <input type="text" id="edit_platform" value="${escapeHtml(safe(merchant.platform))}">
+        </div>
+        <div>
+          <label>🆔 Shop ID</label>
+          <input type="text" id="edit_shopId" value="${escapeHtml(safe(merchant.shopId))}" disabled style="background:#f1f5f9;">
+        </div>
+        <div class="full-width">
+          <label>📝 Other Details</label>
+          <textarea id="edit_otherDetails" rows="2">${escapeHtml(safe(merchant.otherDetails))}</textarea>
+        </div>
+      </div>
+      <div class="info-text">
+        <strong>📧 Email:</strong> ${escapeHtml(safe(merchant.submitterEmail))} &nbsp;|&nbsp;
+        <strong>🆔 CNIC:</strong> ${escapeHtml(safe(merchant.cnic))} &nbsp;|&nbsp;
+        <strong>💵 COD:</strong> ${escapeHtml(safe(merchant.isCashOnDelivery))} &nbsp;|&nbsp;
+        <strong>⏱️ Applied:</strong> ${escapeHtml(safe(merchant.appliedAt))}
+      </div>
+      <div>
+        <strong>📜 Policies (Dropshipping):</strong> ${escapeHtml(safe(merchant.privacyPolicyForDropshipping))}<br>
+        <strong>📜 Policies (Customers):</strong> ${escapeHtml(safe(merchant.privacyPolicyForCustomers))}
+      </div>
+      <div style="margin-top: 16px;">
+        <strong>🖼️ Owner Profile Image</strong>
+        <div class="image-strip">
+          ${merchant.ownerProfileImage ? `<img src="${escapeHtml(merchant.ownerProfileImage)}" alt="owner" onerror="this.style.opacity='0.5'">` : '<span class="info-text">No image</span>'}
+        </div>
+        <strong style="display:block; margin-top:12px">📦 Product Images</strong>
+        <div class="image-strip">
+          ${Array.isArray(merchant.productImages) && merchant.productImages.length ? merchant.productImages.map(img => `<img src="${escapeHtml(img)}" onerror="this.style.display='none'">`).join('') : '<span>No product images</span>'}
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="modalUpdateBtn" class="btn-success" style="background:#0891b2;">💾 Update Changes</button>
+        <button id="modalApproveBtn" class="btn-success">✅ Approve Application</button>
+        <button onclick="closeModal()" class="btn-outline">❌ Close</button>
+      </div>
+    `;
+
+    const modal = document.getElementById("detailsModal");
+    const contentDiv = document.getElementById("modalContentInner");
+    contentDiv.innerHTML = modalHtml;
+    modal.style.display = "flex";
+
+    // attach update event listener dynamically
+    document.getElementById("modalUpdateBtn").onclick = () => updateMerchantDocument(id);
+    document.getElementById("modalApproveBtn").onclick = () => {
+      approveApplication(id);
+      closeModal();
+    };
+  };
+
+  // Helper to escape HTML to prevent injection
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+      return c;
+    });
+  }
+
+  // ======================== UPDATE DOCUMENT (Editable fields) ========================
+  async function updateMerchantDocument(id) {
+    try {
+      const updatedFields = {
+        shopName: document.getElementById("edit_shopName")?.value.trim() || "",
+        ownerName: document.getElementById("edit_ownerName")?.value.trim() || "",
+        ownerNumber: document.getElementById("edit_ownerNumber")?.value.trim() || "",
+        shopNature: document.getElementById("edit_shopNature")?.value.trim() || "",
+        platform: document.getElementById("edit_platform")?.value.trim() || "",
+        otherDetails: document.getElementById("edit_otherDetails")?.value.trim() || ""
+      };
+      // optional: update any additional fields we may want (keeping status unchanged)
+      await db.collection("merchantApplication").doc(id).update(updatedFields);
+      alert("✅ Merchant details updated successfully!");
+      closeModal();
+      await loadMerchantData();  // refresh table & allMerchants
+    } catch (error) {
+      console.error("Update error:", error);
+      alert("⚠️ Update failed: " + error.message);
+    }
+  }
+
+  // ======================== APPROVE (status to approved) ========================
+  window.approveApplication = async (id) => {
+    try {
+      await db.collection("merchantApplication").doc(id).update({
+        status: "approved"
+      });
+      alert("✅ Application approved!");
+      await loadMerchantData();
+    } catch (error) {
+      console.error("Approve error:", error);
+      alert("Approve failed: " + error.message);
+    }
+  };
+
+  // ======================== DELETE DOCUMENT ========================
+  window.deleteApplication = async (id) => {
+    if (!confirm("⚠️ Permanently delete this merchant application? This action cannot be undone.")) return;
+    try {
+      await db.collection("merchantApplication").doc(id).delete();
+      alert("🗑️ Record deleted.");
+      await loadMerchantData();
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Delete failed: " + error.message);
+    }
+  };
+
+  // ======================== MODAL CONTROLS ========================
+  window.closeModal = () => {
+    document.getElementById("detailsModal").style.display = "none";
+  };
+  // click outside modal background to close
+  window.onclick = (event) => {
+    const modal = document.getElementById("detailsModal");
+    if (event.target === modal) closeModal();
+  };
+
+  // ======================== EXPORT FUNCTIONS ========================
+  window.downloadJSON = () => {
+    if (!allMerchants.length) { alert("No data to export"); return; }
+    const exportData = allMerchants.map(({ id, ...rest }) => rest);
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `merchants_${new Date().toISOString().slice(0,19)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  window.downloadCSV = () => {
+    if (!allMerchants.length) { alert("No data"); return; }
+    let csvRows = [["Shop Name", "Owner Name", "Email", "Status", "Platform", "Phone"]];
+    for (const m of allMerchants) {
+      csvRows.push([
+        `"${(m.shopName || "").replace(/"/g, '""')}"`,
+        `"${(m.ownerName || "").replace(/"/g, '""')}"`,
+        `"${(m.submitterEmail || "").replace(/"/g, '""')}"`,
+        `"${(m.status || "pending").replace(/"/g, '""')}"`,
+        `"${(m.platform || "").replace(/"/g, '""')}"`,
+        `"${(m.ownerNumber || "").replace(/"/g, '""')}"`
+      ]);
+    }
+    const csvContent = csvRows.map(row => row.join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "merchant_report.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  window.downloadPDF = async () => {
+    if (!allMerchants.length) { alert("Nothing to export"); return; }
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    let y = 20;
+    doc.setFontSize(16);
+    doc.text("Merchant Applications Summary", 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    for (let i = 0; i < allMerchants.length; i++) {
+      const m = allMerchants[i];
+      const line = `${i+1}. ${m.shopName || "No name"} | ${m.ownerName || "—"} | ${m.status || "pending"}`;
+      doc.text(line, 14, y);
+      y += 6;
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+    }
+    doc.save(`merchants_${Date.now()}.pdf`);
+  };
 
-    let y = 10;
+  // Additional console safety: reload data if needed
+  window.refreshData = loadMerchantData;
 
-    allData.forEach(d => {
-      doc.text(`${d.shopName} | ${d.ownerName} | ${d.status}`, 10, y);
-      y += 10;
-    });
-
-    doc.save("data.pdf");
-  }
-
+  // small styling helper for table consistency
+  console.log("Admin panel ready — ensure Firebase config & Admin email updated.");
 </script>
-
 </body>
 </html>
