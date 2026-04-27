@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Connected Shops Admin Panel</title>
+
+  <!-- Firebase SDK v9 compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #f0f2f8;
+      margin: 0;
+      padding: 24px 20px;
+    }
+    .admin-container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    h2 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin: 0 0 0.25rem 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sub {
+      color: #475569;
+      margin-bottom: 1.5rem;
+      border-left: 4px solid #8b5cf6;
+      padding-left: 12px;
+    }
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+      align-items: center;
+      background: white;
+      padding: 12px 20px;
+      border-radius: 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    button {
+      background: #8b5cf6;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 40px;
+      font-weight: 500;
+      font-size: 0.85rem;
+      color: white;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    button:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-outline {
+      background: #eef2ff;
+      color: #1e40af;
+      box-shadow: none;
+    }
+    .btn-outline:hover { background: #e0e7ff; }
+    .btn-danger { background: #dc2626; }
+    .btn-success { background: #10b981; }
+    .btn-warning { background: #f59e0b; }
+    .btn-info { background: #3b82f6; }
+    .btn-add { background: #8b5cf6; }
+    table {
+      width: 100%;
+      background: white;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      border-collapse: collapse;
+    }
+    th {
+      background: #1e293b;
+      color: white;
+      font-weight: 600;
+      padding: 14px 12px;
+      font-size: 0.85rem;
+    }
+    td {
+      padding: 12px 12px;
+      border-bottom: 1px solid #e9eef3;
+      color: #1f2a44;
+      vertical-align: middle;
+    }
+    tr:hover td { background-color: #fafcff; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .status-active { background: #d1fae5; color: #065f46; }
+    .status-inactive { background: #fee2e2; color: #991b1b; }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .action-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .action-group button {
+      padding: 4px 10px;
+      font-size: 0.7rem;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.6);
+      backdrop-filter: blur(3px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-card {
+      background: white;
+      width: 90%;
+      max-width: 600px;
+      max-height: 85vh;
+      border-radius: 28px;
+      overflow-y: auto;
+      padding: 24px 28px;
+      box-shadow: 0 25px 40px rgba(0,0,0,0.25);
+      animation: fadeSlide 0.2s ease;
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .modal-card h3 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      border-bottom: 2px solid #eef2ff;
+      padding-bottom: 10px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 20px;
+      margin: 20px 0;
+    }
+    .full-width { grid-column: span 2; }
+    label {
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: #334155;
+      display: block;
+      margin-bottom: 4px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      transition: 0.2s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #8b5cf6;
+      box-shadow: 0 0 0 2px rgba(139,92,246,0.2);
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 20px;
+      border-top: 1px solid #eef2ff;
+      padding-top: 20px;
+    }
+    .user-email-badge {
+      background: #eef2ff;
+      padding: 6px 14px;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      color: #1e40af;
+      font-weight: 500;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: white;
+      padding: 12px 20px;
+      border-radius: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #8b5cf6;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+    .filter-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: white;
+      padding: 4px 16px;
+      border-radius: 40px;
+    }
+    .filter-group select, .filter-group input {
+      width: auto;
+      padding: 6px 12px;
+      margin: 0;
+    }
+    @media (max-width: 780px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .full-width { grid-column: span 1; }
+      th, td { font-size: 0.75rem; padding: 8px 6px; }
+    }
+  </style>
+</head>
+<body>
+<div class="admin-container">
+  <h2>🔗 Connected Shops Management</h2>
+  <div class="sub">Manage shop connections, profit percentages, and platform integrations</div>
+
+  <div class="top-bar">
+    <button onclick="login()">🔐 Google Login</button>
+    <button onclick="logout()" class="btn-outline">🚪 Logout</button>
+    <span id="userDisplay" style="flex:1; text-align:right; font-size:0.8rem;"></span>
+    <div class="filter-group">
+      <span>🔍 Filter:</span>
+      <select id="statusFilter" onchange="applyFilter()">
+        <option value="all">All Status</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+        <option value="pending">Pending</option>
+      </select>
+      <input type="text" id="searchInput" placeholder="Shop name / Roll #" onkeyup="applyFilter()">
+    </div>
+    <button onclick="openAddModal()" class="btn-add">➕ Add Connected Shop</button>
+    <button onclick="downloadJSON()">📄 JSON</button>
+    <button onclick="downloadCSV()">📊 CSV</button>
+    <button onclick="downloadPDF()">📑 PDF</button>
+  </div>
+
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card"><div class="stat-number" id="totalShops">0</div><div class="stat-label">Total Shops</div></div>
+    <div class="stat-card"><div class="stat-number" id="activeCount">0</div><div class="stat-label">Active</div></div>
+    <div class="stat-card"><div class="stat-number" id="inactiveCount">0</div><div class="stat-label">Inactive</div></div>
+    <div class="stat-card"><div class="stat-number" id="pendingCount">0</div><div class="stat-label">Pending</div></div>
+  </div>
+
+  <div style="overflow-x: auto;">
+    <table id="shopsTable">
+      <thead>
+        <tr><th>Shop Name</th><th>Shop ID</th><th>Roll Number</th><th>Platform</th><th>Profit %</th><th>Status</th><th>Connected At</th><th style="width:120px">Actions</th></tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="8" style="text-align:center">🔁 Loading connected shops...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal for Add/Edit -->
+<div id="shopModal" class="modal">
+  <div class="modal-card" id="modalContentInner"></div>
+</div>
+
+<script>
+  // Firebase Config (same as provided)
+  const firebaseConfig = {
+    apiKey: "AIzaSyB44kAWSIrjWmYH75g16-J_Mnkip-HvNBM",
+    authDomain: "ayshamall.firebaseapp.com",
+    projectId: "ayshamall",
+    storageBucket: "ayshamall.firebasestorage.app",
+    messagingSenderId: "319564197871",
+    appId: "1:319564197871:web:d0de1f012835234494d01a"
+  };
+  
+  const COLLECTION_NAME = "connectedShops";
+  
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let allShops = [];
+  let filteredShops = [];
+  let currentEditId = null;
+
+  // ======================== AUTH ========================
+  window.login = async () => {
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await auth.signInWithPopup(provider);
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("Login failed: " + err.message);
+    }
+  };
+
+  window.logout = async () => {
+    try {
+      await auth.signOut();
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="8">👋 Logged out. Please login.</td></tr>';
+      document.getElementById("userDisplay").innerHTML = "";
+      allShops = [];
+      updateStats();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+  };
+
+  function updateUserDisplay(user) {
+    const displaySpan = document.getElementById("userDisplay");
+    if (user) displaySpan.innerHTML = `<span class="user-email-badge">✅ ${user.email}</span>`;
+    else displaySpan.innerHTML = '<span class="user-email-badge">🔒 Not logged in</span>';
+  }
+
+  auth.onAuthStateChanged(async (user) => {
+    updateUserDisplay(user);
+    if (user) {
+      await loadShops();
+    } else {
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="8">🔒 Please click "Login" with Google account.</td></tr>';
+      allShops = [];
+      updateStats();
+    }
+  });
+
+  // ======================== LOAD DATA ========================
+  async function loadShops() {
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = '<tr><td colspan="8">⏳ Fetching connected shops...</td></tr>';
+    try {
+      const snapshot = await db.collection(COLLECTION_NAME).orderBy("connectedAt", "desc").get();
+      if (snapshot.empty) {
+        tbody.innerHTML = '<tr><td colspan="8">📭 No connected shops found. Click "Add Connected Shop" to create.</td></tr>';
+        allShops = [];
+        updateStats();
+        return;
+      }
+      const list = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        list.push({ id: doc.id, ...data });
+      });
+      allShops = list;
+      applyFilter();
+      updateStats();
+    } catch (error) {
+      console.error("Load error:", error);
+      alert("Failed to load shops: " + error.message);
+      tbody.innerHTML = '<tr><td colspan="8">⚠️ Error loading data.</td></tr>';
+    }
+  }
+
+  function updateStats() {
+    const total = allShops.length;
+    const active = allShops.filter(s => s.status === 'active').length;
+    const inactive = allShops.filter(s => s.status === 'inactive').length;
+    const pending = allShops.filter(s => s.status === 'pending').length;
+    document.getElementById("totalShops").innerText = total;
+    document.getElementById("activeCount").innerText = active;
+    document.getElementById("inactiveCount").innerText = inactive;
+    document.getElementById("pendingCount").innerText = pending;
+  }
+
+  window.applyFilter = () => {
+    const statusFilter = document.getElementById("statusFilter").value;
+    const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+    filteredShops = allShops.filter(shop => {
+      if (statusFilter !== "all" && shop.status !== statusFilter) return false;
+      if (searchTerm) {
+        return (shop.shopName || "").toLowerCase().includes(searchTerm) ||
+               (shop.rollNumber || "").toLowerCase().includes(searchTerm) ||
+               (shop.shopId || "").toLowerCase().includes(searchTerm);
+      }
+      return true;
+    });
+    renderTable(filteredShops);
+  };
+
+  function renderTable(shops) {
+    const tbody = document.getElementById("tableBody");
+    if (!shops.length) {
+      tbody.innerHTML = '<td><td colspan="8">✨ No matching shops found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = "";
+    shops.forEach(shop => {
+      const row = tbody.insertRow();
+      row.insertCell(0).innerHTML = `<strong>${escapeHtml(shop.shopName || '—')}</strong>`;
+      row.insertCell(1).innerHTML = `<span style="font-family:monospace; font-size:0.75rem;">${escapeHtml(shop.shopId || '—')}</span>`;
+      row.insertCell(2).innerText = shop.rollNumber || "—";
+      row.insertCell(3).innerHTML = `<span style="background:#eef2ff; padding:2px 8px; border-radius:20px;">${escapeHtml(shop.platform || '—')}</span>`;
+      row.insertCell(4).innerHTML = `<span style="font-weight:600; color:#8b5cf6;">${shop.profitPercentage || 0}%</span>`;
+      
+      const status = shop.status || "pending";
+      let statusClass = "status-pending";
+      if (status === 'active') statusClass = "status-active";
+      else if (status === 'inactive') statusClass = "status-inactive";
+      row.insertCell(5).innerHTML = `<span class="status-badge ${statusClass}">${status}</span>`;
+      
+      const connectedDate = shop.connectedAt ? new Date(shop.connectedAt).toLocaleDateString() : "—";
+      row.insertCell(6).innerText = connectedDate;
+      
+      row.insertCell(7).innerHTML = `
+        <div class="action-group">
+          <button onclick="openEditModal('${shop.id}')" class="btn-info" style="background:#3b82f6;">✏️ Edit</button>
+          <button onclick="deleteShop('${shop.id}')" class="btn-danger">🗑 Del</button>
+        </div>
+      `;
+    });
+  }
+
+  // ======================== OPEN ADD MODAL ========================
+  window.openAddModal = () => {
+    currentEditId = null;
+    const modalHtml = `
+      <h3>➕ Add Connected Shop</h3>
+      <div class="form-grid">
+        <div class="full-width"><label>🏪 Shop Name *</label><input type="text" id="shopName" placeholder="e.g., MashaAllah Store"></div>
+        <div><label>🆔 Shop ID *</label><input type="text" id="shopId" placeholder="Unique shop identifier"></div>
+        <div><label>🎫 Roll Number</label><input type="text" id="rollNumber" placeholder="Seller roll number"></div>
+        <div><label>🛒 Platform</label>
+          <select id="platform">
+            <option value="Daraz">Daraz</option>
+            <option value="Shopify">Shopify</option>
+            <option value="WooCommerce">WooCommerce</option>
+            <option value="Custom">Custom</option>
+          </select>
+        </div>
+        <div><label>💰 Profit Percentage (%)</label><input type="number" id="profitPercentage" step="0.1" value="0"></div>
+        <div><label>📌 Status</label>
+          <select id="status">
+            <option value="pending">Pending</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="modalSaveBtn" class="btn-success">💾 Create Shop</button>
+        <button onclick="closeModal()" class="btn-outline">Cancel</button>
+      </div>
+    `;
+    const modal = document.getElementById("shopModal");
+    document.getElementById("modalContentInner").innerHTML = modalHtml;
+    modal.style.display = "flex";
+    document.getElementById("modalSaveBtn").onclick = () => createShop();
+  };
+
+  // ======================== OPEN EDIT MODAL ========================
+  window.openEditModal = (id) => {
+    const shop = allShops.find(s => s.id === id);
+    if (!shop) { alert("Shop not found"); return; }
+    currentEditId = id;
+    const modalHtml = `
+      <h3>✏️ Edit Connected Shop</h3>
+      <div class="form-grid">
+        <div class="full-width"><label>🏪 Shop Name *</label><input type="text" id="shopName" value="${escapeHtml(shop.shopName || '')}"></div>
+        <div><label>🆔 Shop ID *</label><input type="text" id="shopId" value="${escapeHtml(shop.shopId || '')}"></div>
+        <div><label>🎫 Roll Number</label><input type="text" id="rollNumber" value="${escapeHtml(shop.rollNumber || '')}"></div>
+        <div><label>🛒 Platform</label>
+          <select id="platform">
+            <option value="Daraz" ${shop.platform === 'Daraz' ? 'selected' : ''}>Daraz</option>
+            <option value="Shopify" ${shop.platform === 'Shopify' ? 'selected' : ''}>Shopify</option>
+            <option value="WooCommerce" ${shop.platform === 'WooCommerce' ? 'selected' : ''}>WooCommerce</option>
+            <option value="Custom" ${shop.platform === 'Custom' ? 'selected' : ''}>Custom</option>
+          </select>
+        </div>
+        <div><label>💰 Profit Percentage (%)</label><input type="number" id="profitPercentage" step="0.1" value="${shop.profitPercentage || 0}"></div>
+        <div><label>📌 Status</label>
+          <select id="status">
+            <option value="pending" ${shop.status === 'pending' ? 'selected' : ''}>Pending</option>
+            <option value="active" ${shop.status === 'active' ? 'selected' : ''}>Active</option>
+            <option value="inactive" ${shop.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="modalUpdateBtn" class="btn-success">💾 Update Shop</button>
+        <button onclick="closeModal()" class="btn-outline">Cancel</button>
+      </div>
+    `;
+    const modal = document.getElementById("shopModal");
+    document.getElementById("modalContentInner").innerHTML = modalHtml;
+    modal.style.display = "flex";
+    document.getElementById("modalUpdateBtn").onclick = () => updateShop(id);
+  };
+
+  // ======================== CREATE SHOP ========================
+  async function createShop() {
+    try {
+      const shopName = document.getElementById("shopName")?.value.trim();
+      const shopId = document.getElementById("shopId")?.value.trim();
+      if (!shopName || !shopId) {
+        alert("Shop Name and Shop ID are required");
+        return;
+      }
+      const rollNumber = document.getElementById("rollNumber")?.value.trim() || "";
+      const platform = document.getElementById("platform")?.value || "";
+      const profitPercentage = parseFloat(document.getElementById("profitPercentage")?.value) || 0;
+      const status = document.getElementById("status")?.value || "pending";
+      const now = new Date().toISOString();
+      
+      const newShop = {
+        shopName,
+        shopId,
+        rollNumber,
+        platform,
+        profitPercentage,
+        status,
+        connectedAt: now,
+        updatedAt: now
+      };
+      
+      await db.collection(COLLECTION_NAME).add(newShop);
+      alert("✅ Connected shop added successfully!");
+      closeModal();
+      await loadShops();
+    } catch (error) {
+      console.error("Create error:", error);
+      alert("Failed to create: " + error.message);
+    }
+  }
+
+  // ======================== UPDATE SHOP ========================
+  async function updateShop(id) {
+    try {
+      const shopName = document.getElementById("shopName")?.value.trim();
+      const shopId = document.getElementById("shopId")?.value.trim();
+      if (!shopName || !shopId) {
+        alert("Shop Name and Shop ID are required");
+        return;
+      }
+      const rollNumber = document.getElementById("rollNumber")?.value.trim() || "";
+      const platform = document.getElementById("platform")?.value || "";
+      const profitPercentage = parseFloat(document.getElementById("profitPercentage")?.value) || 0;
+      const status = document.getElementById("status")?.value || "pending";
+      
+      const updateData = {
+        shopName,
+        shopId,
+        rollNumber,
+        platform,
+        profitPercentage,
+        status,
+        updatedAt: new Date().toISOString()
+      };
+      
+      await db.collection(COLLECTION_NAME).doc(id).update(updateData);
+      alert("✅ Shop updated successfully!");
+      closeModal();
+      await loadShops();
+    } catch (error) {
+      console.error("Update error:", error);
+      alert("Update failed: " + error.message);
+    }
+  }
+
+  // ======================== DELETE SHOP ========================
+  window.deleteShop = async (id) => {
+    if (!confirm("⚠️ Permanently delete this connected shop? This action cannot be undone.")) return;
+    try {
+      await db.collection(COLLECTION_NAME).doc(id).delete();
+      alert("🗑️ Shop deleted.");
+      await loadShops();
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Delete failed: " + error.message);
+    }
+  };
+
+  // ======================== MODAL CONTROLS ========================
+  window.closeModal = () => {
+    document.getElementById("shopModal").style.display = "none";
+    currentEditId = null;
+  };
+  window.onclick = (event) => {
+    const modal = document.getElementById("shopModal");
+    if (event.target === modal) closeModal();
+  };
+
+  // ======================== EXPORT FUNCTIONS ========================
+  window.downloadJSON = () => {
+    if (!allShops.length) { alert("No data to export"); return; }
+    const exportData = allShops.map(({ id, ...rest }) => rest);
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `connected_shops_${new Date().toISOString().slice(0,19)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  window.downloadCSV = () => {
+    if (!allShops.length) { alert("No data"); return; }
+    let csvRows = [["Shop Name", "Shop ID", "Roll Number", "Platform", "Profit %", "Status", "Connected At"]];
+    for (const s of allShops) {
+      csvRows.push([
+        `"${(s.shopName || "").replace(/"/g, '""')}"`,
+        `"${(s.shopId || "").replace(/"/g, '""')}"`,
+        `"${(s.rollNumber || "").replace(/"/g, '""')}"`,
+        `"${(s.platform || "").replace(/"/g, '""')}"`,
+        s.profitPercentage || 0,
+        `"${(s.status || "pending").replace(/"/g, '""')}"`,
+        s.connectedAt ? new Date(s.connectedAt).toLocaleDateString() : ""
+      ]);
+    }
+    const csvContent = csvRows.map(row => row.join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "connected_shops.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  window.downloadPDF = async () => {
+    if (!allShops.length) { alert("Nothing to export"); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    let y = 20;
+    doc.setFontSize(14);
+    doc.text("Connected Shops Report", 14, y);
+    y += 8;
+    doc.setFontSize(8);
+    for (let i = 0; i < Math.min(allShops.length, 60); i++) {
+      const s = allShops[i];
+      const line = `${i+1}. ${s.shopName || "N/A"} | ${s.shopId || "—"} | ${s.platform || "—"} | ${s.status || "pending"} | Profit: ${s.profitPercentage || 0}%`;
+      doc.text(line, 14, y);
+      y += 5;
+      if (y > 190) { doc.addPage(); y = 20; }
+    }
+    doc.save(`connected_shops_${Date.now()}.pdf`);
+  };
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
+  }
+
+  console.log("Connected Shops Panel Ready — Collection: connectedShops");
+</script>
+</body>
+</html>
