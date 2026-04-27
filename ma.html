@@ -327,7 +327,7 @@
     const tbody = document.getElementById("tableBody");
     tbody.innerHTML = '<tr><td colspan="5">⏳ Fetching merchant applications...</td></tr>';
     try {
-      const snapshot = await db.collection("merchantApplication").get();
+      const snapshot = await db.collection("merchantApplications").get();
       if (snapshot.empty) {
         tbody.innerHTML = '<tr><td colspan="5">📭 No merchant applications found.</td></tr>';
         allMerchants = [];
@@ -486,7 +486,7 @@
         platform: document.getElementById("edit_platform")?.value.trim() || "",
         otherDetails: document.getElementById("edit_otherDetails")?.value.trim() || ""
       };
-      await db.collection("merchantApplication").doc(id).update(updatedFields);
+      await db.collection("merchantApplications").doc(id).update(updatedFields);
       alert("✅ Merchant details updated successfully!");
       closeModal();
       await loadMerchantData();  // refresh table & allMerchants
@@ -499,7 +499,7 @@
   // ======================== APPROVE (status to approved) ========================
   window.approveApplication = async (id) => {
     try {
-      await db.collection("merchantApplication").doc(id).update({
+      await db.collection("merchantApplications").doc(id).update({
         status: "approved"
       });
       alert("✅ Application approved!");
@@ -514,7 +514,7 @@
   window.deleteApplication = async (id) => {
     if (!confirm("⚠️ Permanently delete this merchant application? This action cannot be undone.")) return;
     try {
-      await db.collection("merchantApplication").doc(id).delete();
+      await db.collection("merchantApplications").doc(id).delete();
       alert("🗑️ Record deleted.");
       await loadMerchantData();
     } catch (error) {
