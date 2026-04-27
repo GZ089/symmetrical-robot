@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>Merchant Admin Panel | Secure Approval & Editable View</title>
+  <title>Merchant Admin Panel | Full Access</title>
 
   <!-- Firebase SDK v9 compat (stable) -->
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
@@ -204,6 +204,14 @@
       font-size: 0.8rem;
       margin: 10px 0;
     }
+    .user-email-badge {
+      background: #eef2ff;
+      padding: 6px 14px;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      color: #1e40af;
+      font-weight: 500;
+    }
     @media (max-width: 680px) {
       .form-grid { grid-template-columns: 1fr; }
       .full-width { grid-column: span 1; }
@@ -215,19 +223,19 @@
 <body>
 <div class="admin-container">
   <h2>⚡ Merchant Admin Panel</h2>
-  <div class="sub">Review, edit, approve & manage applications securely</div>
+  <div class="sub">Review, edit, approve & manage applications</div>
 
   <div class="top-bar">
     <button onclick="login()">🔐 Google Login</button>
     <button onclick="logout()" class="btn-outline">🚪 Logout</button>
-    <span style="flex:1"></span>
+    <span id="userDisplay" style="flex:1; text-align:right; font-size:0.8rem;"></span>
     <button onclick="downloadJSON()">📄 JSON</button>
     <button onclick="downloadCSV()">📊 Excel (CSV)</button>
     <button onclick="downloadPDF()">📑 PDF</button>
   </div>
 
   <div style="overflow-x: auto;">
-    <table>
+    <table id="dataTable">
       <thead>
         <tr><th>Shop</th><th>Owner</th><th>Email</th><th>Status</th><th style="width:160px">Actions</th></tr>
       </thead>
@@ -247,8 +255,8 @@
 
 <script>
   // ======================== FIREBASE CONFIGURATION ========================
-  // ⚠️ REPLACE WITH YOUR ACTUAL FIREBASE PROJECT CREDENTIALS
-    var firebaseConfig = {
+  // Your Firebase config (already provided)
+  var firebaseConfig = {
     apiKey: "AIzaSyB44kAWSIrjWmYH75g16-J_Mnkip-HvNBM",
     authDomain: "ayshamall.firebaseapp.com",
     projectId: "ayshamall",
@@ -256,7 +264,8 @@
     messagingSenderId: "319564197871",
     appId: "1:319564197871:web:d0de1f012835234494d01a"
   };
-  const ADMIN_EMAIL = "studywithsirgul44@gmail.com";        // <-- SET YOUR ADMIN EMAIL
+  
+  // NO ADMIN EMAIL RESTRICTION — any authenticated user can access
 
   // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
@@ -264,8 +273,9 @@
   const db = firebase.firestore();
 
   let allMerchants = [];       // store all docs with id
+  let currentUser = null;
 
-  // ======================== AUTH MANAGEMENT ========================
+  // ======================== AUTH MANAGEMENT (No email restriction) ========================
   window.login = async () => {
     try {
       const provider = new firebase.auth.GoogleAuthProvider();
@@ -280,24 +290,34 @@
     try {
       await auth.signOut();
       document.getElementById("tableBody").innerHTML = '<tr><td colspan="5" style="text-align:center">👋 Logged out. Please login.</td></tr>';
+      document.getElementById("userDisplay").innerHTML = "";
       allMerchants = [];
+      currentUser = null;
     } catch (err) {
       console.error("Logout error:", err);
     }
   };
 
-  auth.onAuthStateChanged(async (user) => {
+  // Update UI with current user info
+  function updateUserDisplay(user) {
+    const displaySpan = document.getElementById("userDisplay");
     if (user) {
-      if (user.email !== ADMIN_EMAIL) {
-        alert(`⛔ Unauthorized: ${user.email} is not admin.`);
-        await auth.signOut();
-        document.getElementById("tableBody").innerHTML = '<tr><td colspan="5" style="text-align:center">Access denied. Please use admin email.</td></tr>';
-        return;
-      }
-      // authorized admin
+      displaySpan.innerHTML = `<span class="user-email-badge">✅ ${user.email}</span>`;
+    } else {
+      displaySpan.innerHTML = '<span class="user-email-badge">🔒 Not logged in</span>';
+    }
+  }
+
+  auth.onAuthStateChanged(async (user) => {
+    currentUser = user;
+    updateUserDisplay(user);
+    
+    if (user) {
+      // ✅ No email restriction - any authenticated user can access
+      console.log("User authenticated:", user.email);
       await loadMerchantData();
     } else {
-      document.getElementById("tableBody").innerHTML = '<tr><td colspan="5" style="text-align:center">🔒 Please click "Login" with admin Google account.</td></tr>';
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="5" style="text-align:center">🔒 Please click "Login" with Google account.</td></tr>';
       allMerchants = [];
     }
   });
@@ -371,7 +391,7 @@
     const safe = (val) => (val === undefined || val === null) ? "" : String(val);
 
     const modalHtml = `
-      <h3>✏️ Edit & Review — ${safe(merchant.shopName)}</h3>
+      <h3>✏️ Edit & Review — ${escapeHtml(safe(merchant.shopName))}</h3>
       <div class="form-grid">
         <div>
           <label>🏪 Shop Name</label>
@@ -466,7 +486,6 @@
         platform: document.getElementById("edit_platform")?.value.trim() || "",
         otherDetails: document.getElementById("edit_otherDetails")?.value.trim() || ""
       };
-      // optional: update any additional fields we may want (keeping status unchanged)
       await db.collection("merchantApplication").doc(id).update(updatedFields);
       alert("✅ Merchant details updated successfully!");
       closeModal();
@@ -573,8 +592,7 @@
   // Additional console safety: reload data if needed
   window.refreshData = loadMerchantData;
 
-  // small styling helper for table consistency
-  console.log("Admin panel ready — ensure Firebase config & Admin email updated.");
+  console.log("Admin panel ready — any authenticated user can access (no email restriction)");
 </script>
 </body>
 </html>
