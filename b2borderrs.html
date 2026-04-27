@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>B2B Orders Admin Panel</title>
+
+  <!-- Firebase SDK v9 compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #f0f2f8;
+      margin: 0;
+      padding: 24px 20px;
+    }
+    .admin-container {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+    h2 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin: 0 0 0.25rem 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sub {
+      color: #475569;
+      margin-bottom: 1.5rem;
+      border-left: 4px solid #f59e0b;
+      padding-left: 12px;
+    }
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+      align-items: center;
+      background: white;
+      padding: 12px 20px;
+      border-radius: 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    button {
+      background: #f59e0b;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 40px;
+      font-weight: 500;
+      font-size: 0.85rem;
+      color: white;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    button:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-outline {
+      background: #eef2ff;
+      color: #1e40af;
+      box-shadow: none;
+    }
+    .btn-outline:hover { background: #e0e7ff; }
+    .btn-danger { background: #dc2626; }
+    .btn-success { background: #10b981; }
+    .btn-warning { background: #f59e0b; }
+    .btn-info { background: #3b82f6; }
+    table {
+      width: 100%;
+      background: white;
+      border-radius: 20px;
+      overflow-x: auto;
+      display: block;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      border-collapse: collapse;
+    }
+    table thead, table tbody {
+      display: table;
+      width: 100%;
+      table-layout: fixed;
+    }
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid #e9eef3;
+      color: #1f2a44;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+    th {
+      background: #1e293b;
+      color: white;
+      font-weight: 600;
+      font-size: 0.8rem;
+      position: sticky;
+      top: 0;
+    }
+    tr:hover td { background-color: #fafcff; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-processing { background: #dbeafe; color: #1e40af; }
+    .status-shipped { background: #d1fae5; color: #065f46; }
+    .status-delivered { background: #a7f3d0; color: #047857; }
+    .status-cancelled { background: #fee2e2; color: #991b1b; }
+    .action-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .action-group button {
+      padding: 4px 10px;
+      font-size: 0.7rem;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.6);
+      backdrop-filter: blur(3px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-card {
+      background: white;
+      width: 90%;
+      max-width: 750px;
+      max-height: 85vh;
+      border-radius: 28px;
+      overflow-y: auto;
+      padding: 24px 28px;
+      box-shadow: 0 25px 40px rgba(0,0,0,0.25);
+      animation: fadeSlide 0.2s ease;
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .modal-card h3 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      border-bottom: 2px solid #eef2ff;
+      padding-bottom: 10px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 20px;
+      margin: 20px 0;
+    }
+    .full-width { grid-column: span 2; }
+    label {
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: #334155;
+      display: block;
+      margin-bottom: 4px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      transition: 0.2s;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 2px rgba(245,158,11,0.2);
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 20px;
+      border-top: 1px solid #eef2ff;
+      padding-top: 20px;
+    }
+    .user-email-badge {
+      background: #eef2ff;
+      padding: 6px 14px;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      color: #1e40af;
+      font-weight: 500;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: white;
+      padding: 12px 20px;
+      border-radius: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      flex: 1;
+      min-width: 120px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #f59e0b;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+    .filter-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: white;
+      padding: 8px 16px;
+      border-radius: 40px;
+    }
+    .filter-group select, .filter-group input {
+      width: auto;
+      padding: 6px 12px;
+      margin: 0;
+    }
+    @media (max-width: 780px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .full-width { grid-column: span 1; }
+      th, td { font-size: 0.75rem; padding: 8px 6px; }
+    }
+  </style>
+</head>
+<body>
+<div class="admin-container">
+  <h2>📦 B2B Orders Management</h2>
+  <div class="sub">Manage customer orders, track status, update order details</div>
+
+  <div class="top-bar">
+    <button onclick="login()">🔐 Google Login</button>
+    <button onclick="logout()" class="btn-outline">🚪 Logout</button>
+    <span id="userDisplay" style="flex:1; text-align:right; font-size:0.8rem;"></span>
+    <div class="filter-group">
+      <span>📊 Filter:</span>
+      <select id="statusFilter" onchange="applyFilter()">
+        <option value="all">All Orders</option>
+        <option value="pending">Pending</option>
+        <option value="processing">Processing</option>
+        <option value="shipped">Shipped</option>
+        <option value="delivered">Delivered</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+      <input type="text" id="searchInput" placeholder="Order ID / Store / Roll #" onkeyup="applyFilter()">
+    </div>
+    <button onclick="downloadJSON()">📄 JSON</button>
+    <button onclick="downloadCSV()">📊 CSV</button>
+    <button onclick="downloadPDF()">📑 PDF</button>
+  </div>
+
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card"><div class="stat-number" id="totalOrders">0</div><div class="stat-label">Total Orders</div></div>
+    <div class="stat-card"><div class="stat-number" id="pendingCount">0</div><div class="stat-label">Pending</div></div>
+    <div class="stat-card"><div class="stat-number" id="processingCount">0</div><div class="stat-label">Processing</div></div>
+    <div class="stat-card"><div class="stat-number" id="deliveredCount">0</div><div class="stat-label">Delivered</div></div>
+  </div>
+
+  <div style="overflow-x: auto;">
+    <table id="ordersTable">
+      <thead>
+        <tr><th>Order ID</th><th>Store Name</th><th>Product</th><th>Price</th><th>Customer</th><th>Phone</th><th>Status</th><th>Order Count</th><th style="width:130px">Actions</th></tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="9" style="text-align:center">🔁 Loading orders...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal for Edit/Create -->
+<div id="orderModal" class="modal">
+  <div class="modal-card" id="modalContentInner"></div>
+</div>
+
+<script>
+  // Firebase Config (same as provided)
+  const firebaseConfig = {
+    apiKey: "AIzaSyB44kAWSIrjWmYH75g16-J_Mnkip-HvNBM",
+    authDomain: "ayshamall.firebaseapp.com",
+    projectId: "ayshamall",
+    storageBucket: "ayshamall.firebasestorage.app",
+    messagingSenderId: "319564197871",
+    appId: "1:319564197871:web:d0de1f012835234494d01a"
+  };
+  
+  const COLLECTION_NAME = "b2borders";
+  
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let allOrders = [];
+  let filteredOrders = [];
+  let currentEditId = null;
+
+  // Auth
+  window.login = async () => {
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await auth.signInWithPopup(provider);
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("Login failed: " + err.message);
+    }
+  };
+
+  window.logout = async () => {
+    try {
+      await auth.signOut();
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="9">👋 Logged out. Please login.</td></tr>';
+      document.getElementById("userDisplay").innerHTML = "";
+      allOrders = [];
+      updateStats();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+  };
+
+  function updateUserDisplay(user) {
+    const displaySpan = document.getElementById("userDisplay");
+    if (user) displaySpan.innerHTML = `<span class="user-email-badge">✅ ${user.email}</span>`;
+    else displaySpan.innerHTML = '<span class="user-email-badge">🔒 Not logged in</span>';
+  }
+
+  auth.onAuthStateChanged(async (user) => {
+    updateUserDisplay(user);
+    if (user) {
+      await loadOrders();
+    } else {
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="9">🔒 Please click "Login" with Google account.</td></tr>';
+      allOrders = [];
+      updateStats();
+    }
+  });
+
+  // Load Orders
+  async function loadOrders() {
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = '<tr><td colspan="9">⏳ Fetching B2B orders...</td></tr>';
+    try {
+      const snapshot = await db.collection(COLLECTION_NAME).orderBy("createdAt", "desc").get();
+      if (snapshot.empty) {
+        tbody.innerHTML = '<tr><td colspan="9">📭 No orders found.</td></tr>';
+        allOrders = [];
+        updateStats();
+        return;
+      }
+      const list = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        list.push({ id: doc.id, ...data });
+      });
+      allOrders = list;
+      applyFilter();
+      updateStats();
+    } catch (error) {
+      console.error("Load error:", error);
+      alert("Failed to load orders: " + error.message);
+      tbody.innerHTML = '<tr><td colspan="9">⚠️ Error loading data.</td></tr>';
+    }
+  }
+
+  function updateStats() {
+    const total = allOrders.length;
+    const pending = allOrders.filter(o => o.status === 'pending').length;
+    const processing = allOrders.filter(o => o.status === 'processing').length;
+    const delivered = allOrders.filter(o => o.status === 'delivered').length;
+    document.getElementById("totalOrders").innerText = total;
+    document.getElementById("pendingCount").innerText = pending;
+    document.getElementById("processingCount").innerText = processing;
+    document.getElementById("deliveredCount").innerText = delivered;
+  }
+
+  window.applyFilter = () => {
+    const statusFilter = document.getElementById("statusFilter").value;
+    const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+    filteredOrders = allOrders.filter(order => {
+      if (statusFilter !== "all" && order.status !== statusFilter) return false;
+      if (searchTerm) {
+        return (order.orderId || "").toLowerCase().includes(searchTerm) ||
+               (order.storeName || "").toLowerCase().includes(searchTerm) ||
+               (order.rollNumber || "").toLowerCase().includes(searchTerm);
+      }
+      return true;
+    });
+    renderTable(filteredOrders);
+  };
+
+  function renderTable(orders) {
+    const tbody = document.getElementById("tableBody");
+    if (!orders.length) {
+      tbody.innerHTML = '<tr><td colspan="9">✨ No matching orders.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = "";
+    orders.forEach(order => {
+      const row = tbody.insertRow();
+      row.insertCell(0).innerHTML = `<span class="badge-id">${escapeHtml(order.orderId || '—')}</span>`;
+      row.insertCell(1).innerText = order.storeName || "—";
+      row.insertCell(2).innerHTML = `<small>${escapeHtml(order.productTitle || '—')}</small><br><span style="font-size:10px">ID: ${escapeHtml(order.productId || '')}</span>`;
+      row.insertCell(3).innerText = order.productPrice ? `Rs. ${order.productPrice}` : "—";
+      row.insertCell(4).innerText = order.address ? (order.address.substring(0, 30) + (order.address.length > 30 ? '…' : '')) : "—";
+      row.insertCell(5).innerText = order.phone || order.altPhone || "—";
+      
+      const status = order.status || "pending";
+      let statusClass = "status-pending";
+      if (status === 'processing') statusClass = "status-processing";
+      else if (status === 'shipped') statusClass = "status-shipped";
+      else if (status === 'delivered') statusClass = "status-delivered";
+      else if (status === 'cancelled') statusClass = "status-cancelled";
+      row.insertCell(6).innerHTML = `<span class="status-badge ${statusClass}">${status}</span>`;
+      row.insertCell(7).innerText = order.orderCount || 0;
+      
+      row.insertCell(8).innerHTML = `
+        <div class="action-group">
+          <button onclick="openEditModal('${order.id}')" class="btn-info" style="background:#3b82f6;">✏️ Edit</button>
+          <button onclick="deleteOrder('${order.id}')" class="btn-danger">🗑 Del</button>
+        </div>
+      `;
+    });
+  }
+
+  // Open Add Modal (optional - admin can add orders manually)
+  window.openAddModal = () => {
+    currentEditId = null;
+    showModalForm(null);
+  };
+
+  function showModalForm(orderData = null) {
+    const isEdit = !!orderData;
+    const modalHtml = `
+      <h3>${isEdit ? '✏️ Edit Order' : '➕ Create New Order'}</h3>
+      <div class="form-grid">
+        <div class="full-width"><label>🆔 Order ID *</label><input id="orderId" value="${escapeHtml(orderData?.orderId || 'ORD_' + Date.now())}"></div>
+        <div><label>🏪 Store Name</label><input id="storeName" value="${escapeHtml(orderData?.storeName || '')}"></div>
+        <div><label>📞 Phone</label><input id="phone" value="${escapeHtml(orderData?.phone || '')}"></div>
+        <div><label>📞 Alternate Phone</label><input id="altPhone" value="${escapeHtml(orderData?.altPhone || '')}"></div>
+        <div class="full-width"><label>📍 Address</label><textarea id="address" rows="2">${escapeHtml(orderData?.address || '')}</textarea></div>
+        <div><label>🎫 Roll Number</label><input id="rollNumber" value="${escapeHtml(orderData?.rollNumber || '')}"></div>
+        <div><label>📦 Product Title</label><input id="productTitle" value="${escapeHtml(orderData?.productTitle || '')}"></div>
+        <div><label>🆔 Product ID</label><input id="productId" value="${escapeHtml(orderData?.productId || '')}"></div>
+        <div><label>💰 Price (Rs.)</label><input id="productPrice" type="number" value="${orderData?.productPrice || ''}"></div>
+        <div><label>🔖 Order Count</label><input id="orderCount" type="number" value="${orderData?.orderCount || 1}"></div>
+        <div><label>📌 Status</label>
+          <select id="status">
+            <option value="pending" ${orderData?.status === 'pending' ? 'selected' : ''}>Pending</option>
+            <option value="processing" ${orderData?.status === 'processing' ? 'selected' : ''}>Processing</option>
+            <option value="shipped" ${orderData?.status === 'shipped' ? 'selected' : ''}>Shipped</option>
+            <option value="delivered" ${orderData?.status === 'delivered' ? 'selected' : ''}>Delivered</option>
+            <option value="cancelled" ${orderData?.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+          </select>
+        </div>
+        <div class="full-width"><label>📝 Special Instructions</label><textarea id="specialInstructions" rows="2">${escapeHtml(orderData?.specialInstructions || '')}</textarea></div>
+      </div>
+      <div class="modal-actions">
+        <button id="modalSaveBtn" class="btn-success">💾 ${isEdit ? 'Update Order' : 'Create Order'}</button>
+        <button onclick="closeModal()" class="btn-outline">Cancel</button>
+      </div>
+    `;
+    const modal = document.getElementById("orderModal");
+    document.getElementById("modalContentInner").innerHTML = modalHtml;
+    modal.style.display = "flex";
+    
+    const saveBtn = document.getElementById("modalSaveBtn");
+    if (isEdit) saveBtn.onclick = () => updateOrder(orderData.id);
+    else saveBtn.onclick = () => createOrder();
+  }
+
+  window.openEditModal = (id) => {
+    const order = allOrders.find(o => o.id === id);
+    if (!order) { alert("Order not found"); return; }
+    currentEditId = id;
+    showModalForm(order);
+  };
+
+  async function createOrder() {
+    try {
+      const orderId = document.getElementById("orderId")?.value.trim();
+      if (!orderId) { alert("Order ID required"); return; }
+      const now = new Date().toISOString();
+      const newOrder = {
+        orderId,
+        storeName: document.getElementById("storeName")?.value.trim() || "",
+        phone: document.getElementById("phone")?.value.trim() || "",
+        altPhone: document.getElementById("altPhone")?.value.trim() || "",
+        address: document.getElementById("address")?.value.trim() || "",
+        rollNumber: document.getElementById("rollNumber")?.value.trim() || "",
+        productTitle: document.getElementById("productTitle")?.value.trim() || "",
+        productId: document.getElementById("productId")?.value.trim() || "",
+        productPrice: parseFloat(document.getElementById("productPrice")?.value) || 0,
+        orderCount: parseInt(document.getElementById("orderCount")?.value) || 1,
+        status: document.getElementById("status")?.value || "pending",
+        specialInstructions: document.getElementById("specialInstructions")?.value.trim() || "",
+        createdAt: now,
+        updatedAt: now,
+        lastOrderAt: now
+      };
+      await db.collection(COLLECTION_NAME).add(newOrder);
+      alert("✅ Order created successfully!");
+      closeModal();
+      await loadOrders();
+    } catch (error) {
+      console.error("Create error:", error);
+      alert("Failed to create order: " + error.message);
+    }
+  }
+
+  async function updateOrder(id) {
+    try {
+      const updateData = {
+        orderId: document.getElementById("orderId")?.value.trim(),
+        storeName: document.getElementById("storeName")?.value.trim() || "",
+        phone: document.getElementById("phone")?.value.trim() || "",
+        altPhone: document.getElementById("altPhone")?.value.trim() || "",
+        address: document.getElementById("address")?.value.trim() || "",
+        rollNumber: document.getElementById("rollNumber")?.value.trim() || "",
+        productTitle: document.getElementById("productTitle")?.value.trim() || "",
+        productId: document.getElementById("productId")?.value.trim() || "",
+        productPrice: parseFloat(document.getElementById("productPrice")?.value) || 0,
+        orderCount: parseInt(document.getElementById("orderCount")?.value) || 1,
+        status: document.getElementById("status")?.value || "pending",
+        specialInstructions: document.getElementById("specialInstructions")?.value.trim() || "",
+        updatedAt: new Date().toISOString()
+      };
+      if (!updateData.orderId) throw new Error("Order ID required");
+      await db.collection(COLLECTION_NAME).doc(id).update(updateData);
+      alert("✅ Order updated!");
+      closeModal();
+      await loadOrders();
+    } catch (error) {
+      console.error("Update error:", error);
+      alert("Update failed: " + error.message);
+    }
+  }
+
+  window.deleteOrder = async (id) => {
+    if (!confirm("⚠️ Permanently delete this order? Cannot be undone.")) return;
+    try {
+      await db.collection(COLLECTION_NAME).doc(id).delete();
+      alert("🗑️ Order deleted.");
+      await loadOrders();
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Delete failed: " + error.message);
+    }
+  };
+
+  window.closeModal = () => {
+    document.getElementById("orderModal").style.display = "none";
+    currentEditId = null;
+  };
+  window.onclick = (event) => {
+    const modal = document.getElementById("orderModal");
+    if (event.target === modal) closeModal();
+  };
+
+  // Export functions
+  window.downloadJSON = () => {
+    if (!allOrders.length) { alert("No data"); return; }
+    const exportData = allOrders.map(({ id, ...rest }) => rest);
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `b2b_orders_${new Date().toISOString().slice(0,19)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  window.downloadCSV = () => {
+    if (!allOrders.length) { alert("No data"); return; }
+    let csvRows = [["Order ID", "Store Name", "Product Title", "Price", "Phone", "Status", "Roll Number", "Address"]];
+    for (const o of allOrders) {
+      csvRows.push([
+        `"${(o.orderId || "").replace(/"/g, '""')}"`,
+        `"${(o.storeName || "").replace(/"/g, '""')}"`,
+        `"${(o.productTitle || "").replace(/"/g, '""')}"`,
+        o.productPrice || "",
+        `"${(o.phone || "").replace(/"/g, '""')}"`,
+        `"${(o.status || "pending").replace(/"/g, '""')}"`,
+        `"${(o.rollNumber || "").replace(/"/g, '""')}"`,
+        `"${(o.address || "").substring(0, 60).replace(/"/g, '""')}"`
+      ]);
+    }
+    const csvContent = csvRows.map(row => row.join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "b2b_orders.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  window.downloadPDF = async () => {
+    if (!allOrders.length) { alert("Nothing to export"); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    let y = 20;
+    doc.setFontSize(14);
+    doc.text("B2B Orders Report", 14, y);
+    y += 8;
+    doc.setFontSize(8);
+    for (let i = 0; i < Math.min(allOrders.length, 50); i++) {
+      const o = allOrders[i];
+      const line = `${i+1}. ${o.orderId || "N/A"} | ${o.storeName || "—"} | ${o.productTitle || "—"} | ${o.status || "pending"}`;
+      doc.text(line, 14, y);
+      y += 5;
+      if (y > 190) { doc.addPage(); y = 20; }
+    }
+    doc.save(`b2b_orders_${Date.now()}.pdf`);
+  };
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
+  }
+
+  console.log("B2B Orders Panel Ready — Collection: b2borders");
+</script>
+</body>
+</html>
