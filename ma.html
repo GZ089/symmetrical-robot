@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Merchant Admin Panel</title>
+
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    .top-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    button {
+      padding: 8px 12px;
+      border: none;
+      background: #2d89ef;
+      color: white;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .danger { background: #e74c3c; }
+    .success { background: #27ae60; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+
+    th {
+      background: #2d89ef;
+      color: white;
+    }
+
+    tr:hover {
+      background: #f1f1f1;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+    }
+
+    .modal-content {
+      background: white;
+      padding: 20px;
+      margin: 5% auto;
+      width: 70%;
+      max-height: 80%;
+      overflow-y: auto;
+      border-radius: 8px;
+    }
+
+    img {
+      margin: 5px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>Merchant Admin Panel</h2>
+
+<div class="top-bar">
+  <button onclick="login()">Login</button>
+  <button onclick="logout()">Logout</button>
+  <button onclick="downloadJSON()">JSON</button>
+  <button onclick="downloadCSV()">Excel</button>
+  <button onclick="downloadPDF()">PDF</button>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Shop</th>
+      <th>Owner</th>
+      <th>Email</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="tableBody"></tbody>
+</table>
+
+<!-- Modal -->
+<div class="modal" id="modal">
+  <div class="modal-content" id="modalContent"></div>
+</div>
+
+<script>
+  // 🔥 CONFIG HERE
+  const firebaseConfig = {
+    apiKey: "YOUR_KEY",
+    authDomain: "YOUR_DOMAIN",
+    projectId: "YOUR_PROJECT_ID"
+  };
+
+  const ADMIN_EMAIL = "YOUR_ADMIN_EMAIL@gmail.com";
+
+  firebase.initializeApp(firebaseConfig);
+
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let allData = [];
+
+  // 🔐 AUTH
+  function login() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider);
+  }
+
+  function logout() {
+    auth.signOut();
+  }
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      if (user.email !== ADMIN_EMAIL) {
+        alert("Not Authorized");
+        auth.signOut();
+        return;
+      }
+      loadData();
+    }
+  });
+
+  // 📥 LOAD DATA
+  async function loadData() {
+    const snapshot = await db.collection("merchantApplication").get();
+
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = "";
+    allData = [];
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      data.id = doc.id;
+      allData.push(data);
+
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+        <td>${data.shopName || ""}</td>
+        <td>${data.ownerName || ""}</td>
+        <td>${data.submitterEmail || ""}</td>
+        <td style="color:${data.status === 'approved' ? 'green' : 'red'}">
+          ${data.status || "pending"}
+        </td>
+        <td>
+          <button onclick="viewDetails('${doc.id}')">View</button>
+          <button class="success" onclick="approve('${doc.id}')">Approve</button>
+          <button class="danger" onclick="deleteDoc('${doc.id}')">Delete</button>
+        </td>
+      `;
+
+      tbody.appendChild(row);
+    });
+  }
+
+  // 👁 VIEW DETAILS
+  function viewDetails(id) {
+    const data = allData.find(d => d.id === id);
+
+    document.getElementById("modal").style.display = "block";
+
+    document.getElementById("modalContent").innerHTML = `
+      <h3>${data.shopName}</h3>
+
+      <b>Shop ID:</b> ${data.shopId}<br>
+      <b>Nature:</b> ${data.shopNature}<br>
+      <b>Platform:</b> ${data.platform}<br>
+      <b>Status:</b> ${data.status}<br>
+      <b>Owner:</b> ${data.ownerName}<br>
+      <b>Phone:</b> ${data.ownerNumber}<br>
+      <b>Email:</b> ${data.submitterEmail}<br>
+      <b>CNIC:</b> ${data.cnic}<br>
+      <b>COD:</b> ${data.isCashOnDelivery}<br>
+      <b>Applied:</b> ${data.appliedAt}<br>
+      <b>Details:</b> ${data.otherDetails}<br>
+
+      <h4>Owner Image</h4>
+      <img src="${data.ownerProfileImage || ""}" width="120"/>
+
+      <h4>Product Images</h4>
+      ${(data.productImages || []).map(i => `<img src="${i}" width="100"/>`).join("")}
+
+      <h4>Policies</h4>
+      <b>Dropshipping:</b> ${data.privacyPolicyForDropshipping}<br>
+      <b>Customers:</b> ${data.privacyPolicyForCustomers}<br>
+
+      <br><br>
+      <button onclick="closeModal()">Close</button>
+    `;
+  }
+
+  function closeModal() {
+    document.getElementById("modal").style.display = "none";
+  }
+
+  // ✅ APPROVE
+  async function approve(id) {
+    await db.collection("merchantApplication").doc(id).update({
+      status: "approved"
+    });
+    loadData();
+  }
+
+  // ❌ DELETE
+  async function deleteDoc(id) {
+    if (confirm("Delete this record?")) {
+      await db.collection("merchantApplication").doc(id).delete();
+      loadData();
+    }
+  }
+
+  // 📦 DOWNLOAD JSON
+  function downloadJSON() {
+    const blob = new Blob([JSON.stringify(allData, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "data.json";
+    a.click();
+  }
+
+  // 📊 CSV (Excel)
+  function downloadCSV() {
+    let csv = "Shop,Owner,Email,Status\n";
+    allData.forEach(d => {
+      csv += `${d.shopName},${d.ownerName},${d.submitterEmail},${d.status}\n`;
+    });
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "data.csv";
+    a.click();
+  }
+
+  // 📄 PDF
+  function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    let y = 10;
+
+    allData.forEach(d => {
+      doc.text(`${d.shopName} | ${d.ownerName} | ${d.status}`, 10, y);
+      y += 10;
+    });
+
+    doc.save("data.pdf");
+  }
+
+</script>
+
+</body>
+</html>
