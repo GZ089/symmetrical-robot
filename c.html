@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>B2B Website Data Admin Panel</title>
+
+  <!-- Firebase SDK v9 compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #f0f2f8;
+      margin: 0;
+      padding: 24px 20px;
+    }
+    .admin-container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    h2 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin: 0 0 0.25rem 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sub {
+      color: #475569;
+      margin-bottom: 1.5rem;
+      border-left: 4px solid #2d89ef;
+      padding-left: 12px;
+    }
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+      align-items: center;
+      background: white;
+      padding: 12px 20px;
+      border-radius: 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    button {
+      background: #2d89ef;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 40px;
+      font-weight: 500;
+      font-size: 0.85rem;
+      color: white;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    button:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-outline {
+      background: #eef2ff;
+      color: #1e40af;
+      box-shadow: none;
+    }
+    .btn-outline:hover { background: #e0e7ff; }
+    .btn-danger { background: #dc2626; }
+    .btn-success { background: #10b981; }
+    .btn-warning { background: #f59e0b; }
+    .btn-add { background: #8b5cf6; }
+    table {
+      width: 100%;
+      background: white;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      border-collapse: collapse;
+    }
+    th {
+      background: #1e293b;
+      color: white;
+      font-weight: 600;
+      padding: 14px 12px;
+      font-size: 0.85rem;
+    }
+    td {
+      padding: 14px 12px;
+      border-bottom: 1px solid #e9eef3;
+      color: #1f2a44;
+      vertical-align: middle;
+    }
+    tr:hover td { background-color: #fafcff; }
+    .action-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .action-group button {
+      padding: 5px 12px;
+      font-size: 0.75rem;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.6);
+      backdrop-filter: blur(3px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-card {
+      background: white;
+      width: 90%;
+      max-width: 800px;
+      max-height: 85vh;
+      border-radius: 28px;
+      overflow-y: auto;
+      padding: 24px 28px;
+      box-shadow: 0 25px 40px rgba(0,0,0,0.25);
+      animation: fadeSlide 0.2s ease;
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .modal-card h3 {
+      margin-top: 0;
+      font-size: 1.6rem;
+      font-weight: 600;
+      border-bottom: 2px solid #eef2ff;
+      padding-bottom: 10px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 20px;
+      margin: 20px 0;
+    }
+    .full-width { grid-column: span 2; }
+    label {
+      font-weight: 600;
+      font-size: 0.8rem;
+      color: #334155;
+      display: block;
+      margin-bottom: 4px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      transition: 0.2s;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #2d89ef;
+      box-shadow: 0 0 0 2px rgba(45,137,239,0.2);
+    }
+    .social-entry {
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .social-entry input {
+      flex: 1;
+      min-width: 150px;
+    }
+    .remove-social {
+      background: #ef4444;
+      padding: 6px 12px;
+      font-size: 0.7rem;
+    }
+    .user-email-badge {
+      background: #eef2ff;
+      padding: 6px 14px;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      color: #1e40af;
+      font-weight: 500;
+    }
+    .badge-id {
+      font-family: monospace;
+      font-size: 0.7rem;
+      background: #f1f5f9;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+    @media (max-width: 680px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .full-width { grid-column: span 1; }
+      .social-entry { flex-direction: column; align-items: stretch; }
+    }
+  </style>
+</head>
+<body>
+<div class="admin-container">
+  <h2>🌐 B2B Website Data Admin Panel</h2>
+  <div class="sub">Manage website info, business details & social media links</div>
+
+  <div class="top-bar">
+    <button onclick="login()">🔐 Google Login</button>
+    <button onclick="logout()" class="btn-outline">🚪 Logout</button>
+    <span id="userDisplay" style="flex:1; text-align:right; font-size:0.8rem;"></span>
+    <button onclick="openAddModal()" class="btn-add">➕ Add New Website</button>
+    <button onclick="downloadJSON()">📄 JSON</button>
+    <button onclick="downloadCSV()">📊 CSV</button>
+    <button onclick="downloadPDF()">📑 PDF</button>
+  </div>
+
+  <div style="overflow-x: auto;">
+    <table>
+      <thead>
+        <tr><th>Website Name</th><th>Business Number</th><th>Seller Roll #</th><th>Social Links</th><th style="width:140px">Actions</th></tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="5" style="text-align:center">🔁 Loading B2B website data...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal for Add/Edit -->
+<div id="dataModal" class="modal">
+  <div class="modal-card" id="modalContentInner">
+    <!-- dynamic content -->
+  </div>
+</div>
+
+<script>
+  // ======================== FIREBASE CONFIGURATION ========================
+  const firebaseConfig = {
+    apiKey: "AIzaSyB44kAWSIrjWmYH75g16-J_Mnkip-HvNBM",
+    authDomain: "ayshamall.firebaseapp.com",
+    projectId: "ayshamall",
+    storageBucket: "ayshamall.firebasestorage.app",
+    messagingSenderId: "319564197871",
+    appId: "1:319564197871:web:d0de1f012835234494d01a"
+  };
+  
+  const COLLECTION_NAME = "B2BWebsiteData";
+  
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let allWebsites = [];       // store all docs
+  let currentUser = null;
+  let currentEditId = null;   // for edit mode
+
+  // ======================== AUTH ========================
+  window.login = async () => {
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await auth.signInWithPopup(provider);
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("Login failed: " + err.message);
+    }
+  };
+
+  window.logout = async () => {
+    try {
+      await auth.signOut();
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="5" style="text-align:center">👋 Logged out. Please login.</td></tr>';
+      document.getElementById("userDisplay").innerHTML = "";
+      allWebsites = [];
+      currentUser = null;
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+  };
+
+  function updateUserDisplay(user) {
+    const displaySpan = document.getElementById("userDisplay");
+    if (user) {
+      displaySpan.innerHTML = `<span class="user-email-badge">✅ ${user.email}</span>`;
+    } else {
+      displaySpan.innerHTML = '<span class="user-email-badge">🔒 Not logged in</span>';
+    }
+  }
+
+  auth.onAuthStateChanged(async (user) => {
+    currentUser = user;
+    updateUserDisplay(user);
+    if (user) {
+      console.log("User authenticated:", user.email);
+      await loadData();
+    } else {
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="5" style="text-align:center">🔒 Please click "Login" with Google account.</td></tr>';
+      allWebsites = [];
+    }
+  });
+
+  // ======================== LOAD DATA ========================
+  async function loadData() {
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = '<tr><td colspan="5">⏳ Fetching B2B website records...</td></tr>';
+    try {
+      const snapshot = await db.collection(COLLECTION_NAME).get();
+      if (snapshot.empty) {
+        tbody.innerHTML = '<tr><td colspan="5">📭 No website data found. Click "Add New Website" to create.</td></tr>';
+        allWebsites = [];
+        return;
+      }
+      const list = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        list.push({ id: doc.id, ...data });
+      });
+      allWebsites = list;
+      renderTable(list);
+    } catch (error) {
+      console.error("Load error:", error);
+      alert("Failed to load data: " + error.message);
+      tbody.innerHTML = '<tr><td colspan="5">⚠️ Error loading data.</td></tr>';
+    }
+  }
+
+  function renderTable(websites) {
+    const tbody = document.getElementById("tableBody");
+    if (!websites.length) {
+      tbody.innerHTML = '<tr><td colspan="5">✨ No records yet. Add a new website.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = "";
+    websites.forEach(item => {
+      const row = tbody.insertRow();
+      const nameCell = row.insertCell(0);
+      const businessCell = row.insertCell(1);
+      const rollCell = row.insertCell(2);
+      const socialCell = row.insertCell(3);
+      const actionsCell = row.insertCell(4);
+
+      nameCell.innerText = item.websiteName || "—";
+      businessCell.innerText = item.businessNumber || "—";
+      rollCell.innerText = item.sellerRollNumber || "—";
+      
+      // Social media preview
+      let socialPreview = "—";
+      if (Array.isArray(item.socialMedia) && item.socialMedia.length) {
+        const platforms = item.socialMedia.map(s => s.platform).filter(Boolean);
+        socialPreview = platforms.join(", ");
+      }
+      socialCell.innerHTML = `<span style="font-size:0.75rem;">${escapeHtml(socialPreview)}</span>`;
+      
+      actionsCell.innerHTML = `
+        <div class="action-group">
+          <button onclick="openEditModal('${item.id}')" style="background:#3b82f6;">✏️ Edit</button>
+          <button onclick="deleteRecord('${item.id}')" class="btn-danger">🗑 Delete</button>
+        </div>
+      `;
+    });
+  }
+
+  // ======================== HELPER: SOCIAL MEDIA ARRAY MANAGEMENT ========================
+  function getSocialMediaFromDOM() {
+    const socialEntries = document.querySelectorAll('.social-entry');
+    const socialArray = [];
+    socialEntries.forEach(entry => {
+      const platformInput = entry.querySelector('.social-platform');
+      const urlInput = entry.querySelector('.social-url');
+      const platform = platformInput ? platformInput.value.trim() : '';
+      const url = urlInput ? urlInput.value.trim() : '';
+      if (platform || url) {
+        socialArray.push({ platform, url });
+      }
+    });
+    return socialArray;
+  }
+
+  function renderSocialInputs(socialMediaArray = []) {
+    const container = document.getElementById('socialContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!socialMediaArray.length) {
+      // add one empty row by default
+      addSocialRow();
+    } else {
+      socialMediaArray.forEach((item, idx) => {
+        addSocialRow(item.platform, item.url);
+      });
+    }
+  }
+
+  function addSocialRow(platform = '', url = '') {
+    const container = document.getElementById('socialContainer');
+    const div = document.createElement('div');
+    div.className = 'social-entry';
+    div.innerHTML = `
+      <input type="text" class="social-platform" placeholder="Platform (e.g., Facebook, Instagram)" value="${escapeHtml(platform)}" style="flex:1">
+      <input type="url" class="social-url" placeholder="Profile URL" value="${escapeHtml(url)}" style="flex:2">
+      <button type="button" class="remove-social" onclick="this.closest('.social-entry').remove()">✖ Remove</button>
+    `;
+    container.appendChild(div);
+  }
+
+  // ======================== OPEN ADD MODAL ========================
+  window.openAddModal = () => {
+    currentEditId = null;
+    const modalHtml = `
+      <h3>➕ Add New Website Data</h3>
+      <div class="form-grid">
+        <div class="full-width">
+          <label>🌐 Website Name *</label>
+          <input type="text" id="websiteName" placeholder="e.g., MashaAllah Traders">
+        </div>
+        <div>
+          <label>📞 Business Number</label>
+          <input type="text" id="businessNumber" placeholder="+92 XXX XXXXXXX">
+        </div>
+        <div>
+          <label>🎫 Seller Roll Number</label>
+          <input type="text" id="sellerRollNumber" placeholder="Unique roll number">
+        </div>
+        <div class="full-width">
+          <label>📝 About / Description</label>
+          <textarea id="about" rows="3" placeholder="Company description, mission, etc."></textarea>
+        </div>
+        <div class="full-width">
+          <label>🔗 Logo URL (website logo)</label>
+          <input type="url" id="websiteLogo" placeholder="https://example.com/logo.png">
+        </div>
+        <div class="full-width">
+          <label>📱 Social Media Links</label>
+          <div id="socialContainer"></div>
+          <button type="button" onclick="addSocialRow()" style="background:#8b5cf6; margin-top:8px;">+ Add Social Account</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="modalSaveBtn" class="btn-success">💾 Save Record</button>
+        <button onclick="closeModal()" class="btn-outline">Cancel</button>
+      </div>
+    `;
+    const modal = document.getElementById("dataModal");
+    document.getElementById("modalContentInner").innerHTML = modalHtml;
+    modal.style.display = "flex";
+    
+    // initialize empty social row
+    if (typeof addSocialRow === 'function') {
+      setTimeout(() => {
+        addSocialRow();
+      }, 10);
+    }
+    document.getElementById("modalSaveBtn").onclick = () => saveRecord();
+  };
+
+  // ======================== OPEN EDIT MODAL ========================
+  window.openEditModal = (id) => {
+    const record = allWebsites.find(r => r.id === id);
+    if (!record) {
+      alert("Record not found");
+      return;
+    }
+    currentEditId = id;
+    
+    const modalHtml = `
+      <h3>✏️ Edit Website: ${escapeHtml(record.websiteName || '')}</h3>
+      <div class="form-grid">
+        <div class="full-width">
+          <label>🌐 Website Name *</label>
+          <input type="text" id="websiteName" value="${escapeHtml(record.websiteName || '')}">
+        </div>
+        <div>
+          <label>📞 Business Number</label>
+          <input type="text" id="businessNumber" value="${escapeHtml(record.businessNumber || '')}">
+        </div>
+        <div>
+          <label>🎫 Seller Roll Number</label>
+          <input type="text" id="sellerRollNumber" value="${escapeHtml(record.sellerRollNumber || '')}">
+        </div>
+        <div class="full-width">
+          <label>📝 About / Description</label>
+          <textarea id="about" rows="3">${escapeHtml(record.about || '')}</textarea>
+        </div>
+        <div class="full-width">
+          <label>🔗 Logo URL (website logo)</label>
+          <input type="url" id="websiteLogo" value="${escapeHtml(record.websiteLogo || '')}">
+        </div>
+        <div class="full-width">
+          <label>📱 Social Media Links</label>
+          <div id="socialContainer"></div>
+          <button type="button" onclick="addSocialRow()" style="background:#8b5cf6; margin-top:8px;">+ Add Social Account</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="modalUpdateBtn" class="btn-success">💾 Update Changes</button>
+        <button onclick="closeModal()" class="btn-outline">Cancel</button>
+      </div>
+    `;
+    const modal = document.getElementById("dataModal");
+    document.getElementById("modalContentInner").innerHTML = modalHtml;
+    modal.style.display = "flex";
+    
+    setTimeout(() => {
+      const socialData = Array.isArray(record.socialMedia) ? record.socialMedia : [];
+      if (socialData.length === 0) {
+        addSocialRow();
+      } else {
+        socialData.forEach(soc => addSocialRow(soc.platform || '', soc.url || ''));
+      }
+    }, 10);
+    
+    document.getElementById("modalUpdateBtn").onclick = () => updateRecord(id);
+  };
+
+  // ======================== SAVE NEW RECORD ========================
+  async function saveRecord() {
+    try {
+      const websiteName = document.getElementById("websiteName")?.value.trim();
+      if (!websiteName) {
+        alert("Website Name is required");
+        return;
+      }
+      const businessNumber = document.getElementById("businessNumber")?.value.trim() || "";
+      const sellerRollNumber = document.getElementById("sellerRollNumber")?.value.trim() || "";
+      const about = document.getElementById("about")?.value.trim() || "";
+      const websiteLogo = document.getElementById("websiteLogo")?.value.trim() || "";
+      const socialMedia = getSocialMediaFromDOM();
+      
+      const now = new Date().toISOString();
+      const newDocRef = db.collection(COLLECTION_NAME).doc();
+      const newId = newDocRef.id;
+      
+      const newData = {
+        about,
+        businessNumber,
+        sellerRollNumber,
+        socialMedia,
+        websiteLogo,
+        websiteName,
+        createdAt: now,
+        updatedAt: now
+      };
+      
+      await newDocRef.set(newData);
+      alert("✅ Website data added successfully!");
+      closeModal();
+      await loadData();
+    } catch (error) {
+      console.error("Save error:", error);
+      alert("Failed to save: " + error.message);
+    }
+  }
+
+  // ======================== UPDATE RECORD ========================
+  async function updateRecord(id) {
+    try {
+      const websiteName = document.getElementById("websiteName")?.value.trim();
+      if (!websiteName) {
+        alert("Website Name is required");
+        return;
+      }
+      const businessNumber = document.getElementById("businessNumber")?.value.trim() || "";
+      const sellerRollNumber = document.getElementById("sellerRollNumber")?.value.trim() || "";
+      const about = document.getElementById("about")?.value.trim() || "";
+      const websiteLogo = document.getElementById("websiteLogo")?.value.trim() || "";
+      const socialMedia = getSocialMediaFromDOM();
+      
+      const updateData = {
+        about,
+        businessNumber,
+        sellerRollNumber,
+        socialMedia,
+        websiteLogo,
+        websiteName,
+        updatedAt: new Date().toISOString()
+      };
+      
+      await db.collection(COLLECTION_NAME).doc(id).update(updateData);
+      alert("✅ Record updated successfully!");
+      closeModal();
+      await loadData();
+    } catch (error) {
+      console.error("Update error:", error);
+      alert("Update failed: " + error.message);
+    }
+  }
+
+  // ======================== DELETE RECORD ========================
+  window.deleteRecord = async (id) => {
+    if (!confirm("⚠️ Permanently delete this website record? This action cannot be undone.")) return;
+    try {
+      await db.collection(COLLECTION_NAME).doc(id).delete();
+      alert("🗑️ Record deleted.");
+      await loadData();
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Delete failed: " + error.message);
+    }
+  };
+
+  // ======================== MODAL CONTROLS ========================
+  window.closeModal = () => {
+    document.getElementById("dataModal").style.display = "none";
+    currentEditId = null;
+  };
+  window.onclick = (event) => {
+    const modal = document.getElementById("dataModal");
+    if (event.target === modal) closeModal();
+  };
+
+  // ======================== EXPORT FUNCTIONS ========================
+  window.downloadJSON = () => {
+    if (!allWebsites.length) { alert("No data to export"); return; }
+    const exportData = allWebsites.map(({ id, ...rest }) => rest);
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `b2b_websites_${new Date().toISOString().slice(0,19)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  window.downloadCSV = () => {
+    if (!allWebsites.length) { alert("No data"); return; }
+    let csvRows = [["Website Name", "Business Number", "Seller Roll Number", "Social Platforms", "About", "Logo URL"]];
+    for (const w of allWebsites) {
+      const socialPlatforms = Array.isArray(w.socialMedia) ? w.socialMedia.map(s => s.platform).join("; ") : "";
+      csvRows.push([
+        `"${(w.websiteName || "").replace(/"/g, '""')}"`,
+        `"${(w.businessNumber || "").replace(/"/g, '""')}"`,
+        `"${(w.sellerRollNumber || "").replace(/"/g, '""')}"`,
+        `"${socialPlatforms.replace(/"/g, '""')}"`,
+        `"${(w.about || "").slice(0, 100).replace(/"/g, '""')}"`,
+        `"${(w.websiteLogo || "").replace(/"/g, '""')}"`
+      ]);
+    }
+    const csvContent = csvRows.map(row => row.join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "b2b_websites.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  window.downloadPDF = async () => {
+    if (!allWebsites.length) { alert("Nothing to export"); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    let y = 20;
+    doc.setFontSize(16);
+    doc.text("B2B Website Data Report", 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    for (let i = 0; i < allWebsites.length; i++) {
+      const w = allWebsites[i];
+      const line = `${i+1}. ${w.websiteName || "No name"} | ${w.businessNumber || "—"} | Roll: ${w.sellerRollNumber || "—"}`;
+      doc.text(line, 14, y);
+      y += 6;
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+    }
+    doc.save(`b2b_websites_${Date.now()}.pdf`);
+  };
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
+  }
+
+  window.addSocialRow = addSocialRow;
+  console.log("Admin panel ready — Collection: B2BWebsiteData");
+</script>
+</body>
+</html>
