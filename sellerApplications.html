@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Seller Applications Admin Panel</title>
+
+  <!-- Firebase SDK v9 compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #f0f2f8;
+      margin: 0;
+      padding: 24px 20px;
+    }
+    .admin-container {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+    h2 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin: 0 0 0.25rem 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sub {
+      color: #475569;
+      margin-bottom: 1.5rem;
+      border-left: 4px solid #06b6d4;
+      padding-left: 12px;
+    }
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+      align-items: center;
+      background: white;
+      padding: 12px 20px;
+      border-radius: 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    button {
+      background: #06b6d4;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 40px;
+      font-weight: 500;
+      font-size: 0.85rem;
+      color: white;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    button:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-outline {
+      background: #eef2ff;
+      color: #1e40af;
+      box-shadow: none;
+    }
+    .btn-outline:hover { background: #e0e7ff; }
+    .btn-danger { background: #dc2626; }
+    .btn-success { background: #10b981; }
+    .btn-warning { background: #f59e0b; }
+    .btn-info { background: #3b82f6; }
+    .btn-approve { background: #10b981; }
+    .btn-reject { background: #ef4444; }
+    table {
+      width: 100%;
+      background: white;
+      border-radius: 20px;
+      overflow-x: auto;
+      display: block;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      border-collapse: collapse;
+    }
+    table thead, table tbody {
+      display: table;
+      width: 100%;
+      table-layout: fixed;
+    }
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid #e9eef3;
+      color: #1f2a44;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+    th {
+      background: #1e293b;
+      color: white;
+      font-weight: 600;
+      font-size: 0.8rem;
+      position: sticky;
+      top: 0;
+    }
+    tr:hover td { background-color: #fafcff; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-approved { background: #d1fae5; color: #065f46; }
+    .status-rejected { background: #fee2e2; color: #991b1b; }
+    .action-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .action-group button {
+      padding: 4px 10px;
+      font-size: 0.7rem;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.6);
+      backdrop-filter: blur(3px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-card {
+      background: white;
+      width: 90%;
+      max-width: 800px;
+      max-height: 85vh;
+      border-radius: 28px;
+      overflow-y: auto;
+      padding: 24px 28px;
+      box-shadow: 0 25px 40px rgba(0,0,0,0.25);
+      animation: fadeSlide 0.2s ease;
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .modal-card h3 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      border-bottom: 2px solid #eef2ff;
+      padding-bottom: 10px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 20px;
+      margin: 20px 0;
+    }
+    .full-width { grid-column: span 2; }
+    label {
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: #334155;
+      display: block;
+      margin-bottom: 4px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      transition: 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #06b6d4;
+      box-shadow: 0 0 0 2px rgba(6,182,212,0.2);
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 20px;
+      border-top: 1px solid #eef2ff;
+      padding-top: 20px;
+    }
+    .user-email-badge {
+      background: #eef2ff;
+      padding: 6px 14px;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      color: #1e40af;
+      font-weight: 500;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: white;
+      padding: 12px 20px;
+      border-radius: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #06b6d4;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+    .filter-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: white;
+      padding: 4px 16px;
+      border-radius: 40px;
+    }
+    .filter-group select, .filter-group input {
+      width: auto;
+      padding: 6px 12px;
+      margin: 0;
+    }
+    .image-preview {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 12px;
+      margin-top: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    .documents-section {
+      background: #f8fafc;
+      padding: 16px;
+      border-radius: 20px;
+      margin: 16px 0;
+    }
+    .info-row {
+      display: flex;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+    }
+    .info-label {
+      font-weight: 600;
+      width: 120px;
+      color: #475569;
+    }
+    .info-value {
+      color: #1e293b;
+      flex: 1;
+    }
+    @media (max-width: 780px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .full-width { grid-column: span 1; }
+      th, td { font-size: 0.7rem; padding: 8px 6px; }
+    }
+  </style>
+</head>
+<body>
+<div class="admin-container">
+  <h2>📝 Seller Applications Management</h2>
+  <div class="sub">Review seller applications, manage documents, approve or reject sellers</div>
+
+  <div class="top-bar">
+    <button onclick="login()">🔐 Google Login</button>
+    <button onclick="logout()" class="btn-outline">🚪 Logout</button>
+    <span id="userDisplay" style="flex:1; text-align:right; font-size:0.8rem;"></span>
+    <div class="filter-group">
+      <span>🔍 Filter:</span>
+      <select id="statusFilter" onchange="applyFilter()">
+        <option value="all">All Status</option>
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+      </select>
+      <input type="text" id="searchInput" placeholder="Roll # / Name / CNIC" onkeyup="applyFilter()">
+    </div>
+    <button onclick="downloadJSON()">📄 JSON</button>
+    <button onclick="downloadCSV()">📊 CSV</button>
+    <button onclick="downloadPDF()">📑 PDF</button>
+  </div>
+
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card"><div class="stat-number" id="totalApps">0</div><div class="stat-label">Total Apps</div></div>
+    <div class="stat-card"><div class="stat-number" id="pendingCount">0</div><div class="stat-label">Pending</div></div>
+    <div class="stat-card"><div class="stat-number" id="approvedCount">0</div><div class="stat-label">Approved</div></div>
+    <div class="stat-card"><div class="stat-number" id="rejectedCount">0</div><div class="stat-label">Rejected</div></div>
+  </div>
+
+  <div style="overflow-x: auto;">
+    <table id="applicationsTable">
+      <thead>
+        <tr><th>Roll Number</th><th>Full Name</th><th>CNIC</th><th>Phone</th><th>Platform</th><th>Role</th><th>Status</th><th>Applied At</th><th style="width:140px">Actions</th></tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="9" style="text-align:center">🔁 Loading seller applications...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal for View/Edit -->
+<div id="appModal" class="modal">
+  <div class="modal-card" id="modalContentInner"></div>
+</div>
+
+<script>
+  // Firebase Config (same as provided)
+  const firebaseConfig = {
+    apiKey: "AIzaSyB44kAWSIrjWmYH75g16-J_Mnkip-HvNBM",
+    authDomain: "ayshamall.firebaseapp.com",
+    projectId: "ayshamall",
+    storageBucket: "ayshamall.firebasestorage.app",
+    messagingSenderId: "319564197871",
+    appId: "1:319564197871:web:d0de1f012835234494d01a"
+  };
+  
+  const COLLECTION_NAME = "sellerApplications";
+  
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let allApps = [];
+  let filteredApps = [];
+  let currentEditId = null;
+
+  // ======================== AUTH ========================
+  window.login = async () => {
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await auth.signInWithPopup(provider);
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("Login failed: " + err.message);
+    }
+  };
+
+  window.logout = async () => {
+    try {
+      await auth.signOut();
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="9">👋 Logged out. Please login.</td></tr>';
+      document.getElementById("userDisplay").innerHTML = "";
+      allApps = [];
+      updateStats();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+  };
+
+  function updateUserDisplay(user) {
+    const displaySpan = document.getElementById("userDisplay");
+    if (user) displaySpan.innerHTML = `<span class="user-email-badge">✅ ${user.email}</span>`;
+    else displaySpan.innerHTML = '<span class="user-email-badge">🔒 Not logged in</span>';
+  }
+
+  auth.onAuthStateChanged(async (user) => {
+    updateUserDisplay(user);
+    if (user) {
+      await loadApplications();
+    } else {
+      document.getElementById("tableBody").innerHTML = '<tr><td colspan="9">🔒 Please click "Login" with Google account.</td></tr>';
+      allApps = [];
+      updateStats();
+    }
+  });
+
+  // ======================== LOAD DATA ========================
+  async function loadApplications() {
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = '<tr><td colspan="9">⏳ Fetching seller applications...</td></tr>';
+    try {
+      const snapshot = await db.collection(COLLECTION_NAME).orderBy("appliedAt", "desc").get();
+      if (snapshot.empty) {
+        tbody.innerHTML = '<tr><td colspan="9">📭 No seller applications found.</td></tr>';
+        allApps = [];
+        updateStats();
+        return;
+      }
+      const list = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        list.push({ id: doc.id, ...data });
+      });
+      allApps = list;
+      applyFilter();
+      updateStats();
+    } catch (error) {
+      console.error("Load error:", error);
+      alert("Failed to load applications: " + error.message);
+      tbody.innerHTML = '<tr><td colspan="9">⚠️ Error loading data.</td></tr>';
+    }
+  }
+
+  function updateStats() {
+    const total = allApps.length;
+    const pending = allApps.filter(a => a.status === 'pending').length;
+    const approved = allApps.filter(a => a.status === 'approved').length;
+    const rejected = allApps.filter(a => a.status === 'rejected').length;
+    document.getElementById("totalApps").innerText = total;
+    document.getElementById("pendingCount").innerText = pending;
+    document.getElementById("approvedCount").innerText = approved;
+    document.getElementById("rejectedCount").innerText = rejected;
+  }
+
+  window.applyFilter = () => {
+    const statusFilter = document.getElementById("statusFilter").value;
+    const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+    filteredApps = allApps.filter(app => {
+      if (statusFilter !== "all" && app.status !== statusFilter) return false;
+      if (searchTerm) {
+        return (app.rollNumber || "").toLowerCase().includes(searchTerm) ||
+               (app.documents?.fullName || "").toLowerCase().includes(searchTerm) ||
+               (app.cnic || "").includes(searchTerm);
+      }
+      return true;
+    });
+    renderTable(filteredApps);
+  };
+
+  function renderTable(apps) {
+    const tbody = document.getElementById("tableBody");
+    if (!apps.length) {
+      tbody.innerHTML = '<tr><td colspan="9">✨ No matching applications found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = "";
+    apps.forEach(app => {
+      const row = tbody.insertRow();
+      row.insertCell(0).innerHTML = `<span style="font-family:monospace; font-size:0.75rem;">${escapeHtml(app.rollNumber || '—')}</span>`;
+      row.insertCell(1).innerHTML = `<strong>${escapeHtml(app.documents?.fullName || app.authName || '—')}</strong>`;
+      row.insertCell(2).innerText = app.cnic || "—";
+      row.insertCell(3).innerText = app.documents?.phone || app.accountNumber || "—";
+      row.insertCell(4).innerHTML = `<span style="background:#eef2ff; padding:2px 8px; border-radius:20px;">${escapeHtml(app.platform || '—')}</span>`;
+      row.insertCell(5).innerText = app.role || "dropshipper";
+      
+      const status = app.status || "pending";
+      let statusClass = "status-pending";
+      if (status === 'approved') statusClass = "status-approved";
+      else if (status === 'rejected') statusClass = "status-rejected";
+      row.insertCell(6).innerHTML = `<span class="status-badge ${statusClass}">${status}</span>`;
+      
+      const appliedDate = app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : "—";
+      row.insertCell(7).innerText = appliedDate;
+      
+      row.insertCell(8).innerHTML = `
+        <div class="action-group">
+          <button onclick="viewApplication('${app.id}')" class="btn-info" style="background:#3b82f6;">👁 View</button>
+          <button onclick="approveApp('${app.id}')" class="btn-approve">✅ Approve</button>
+          <button onclick="rejectApp('${app.id}')" class="btn-reject">❌ Reject</button>
+          <button onclick="deleteApp('${app.id}')" class="btn-danger">🗑 Del</button>
+        </div>
+      `;
+    });
+  }
+
+  // ======================== VIEW APPLICATION WITH IMAGES ========================
+  window.viewApplication = (id) => {
+    const app = allApps.find(a => a.id === id);
+    if (!app) { alert("Application not found"); return; }
+    
+    const documents = app.documents || {};
+    const logoBase64 = documents.logoBase64 || "";
+    
+    const modalHtml = `
+      <h3>📋 Seller Application Details</h3>
+      <div class="documents-section">
+        <h4 style="margin-top:0;">👤 Personal Information</h4>
+        <div class="info-row"><span class="info-label">Roll Number:</span><span class="info-value">${escapeHtml(app.rollNumber || '—')}</span></div>
+        <div class="info-row"><span class="info-label">Full Name:</span><span class="info-value">${escapeHtml(documents.fullName || app.authName || '—')}</span></div>
+        <div class="info-row"><span class="info-label">CNIC:</span><span class="info-value">${escapeHtml(app.cnic || '—')}</span></div>
+        <div class="info-row"><span class="info-label">Phone:</span><span class="info-value">${escapeHtml(documents.phone || app.accountNumber || '—')}</span></div>
+        <div class="info-row"><span class="info-label">IP Address:</span><span class="info-value">${escapeHtml(documents.ipAddress || '—')}</span></div>
+        <div class="info-row"><span class="info-label">Email:</span><span class="info-value">${escapeHtml(app.authEmail || '—')}</span></div>
+        <div class="info-row"><span class="info-label">Auth UID:</span><span class="info-value">${escapeHtml(app.authUid || '—')}</span></div>
+      </div>
+      
+      <div class="documents-section">
+        <h4>🏢 Business Information</h4>
+        <div class="info-row"><span class="info-label">Platform:</span><span class="info-value">${escapeHtml(app.platform || '—')}</span></div>
+        <div class="info-row"><span class="info-label">Role:</span><span class="info-value">${escapeHtml(app.role || 'dropshipper')}</span></div>
+        <div class="info-row"><span class="info-label">Address:</span><span class="info-value">${escapeHtml(app.address || '—')}</span></div>
+        <div class="info-row"><span class="info-label">City:</span><span class="info-value">${escapeHtml(app.city || '—')}</span></div>
+        <div class="info-row"><span class="info-label">Bank Name:</span><span class="info-value">${escapeHtml(app.bankName || '—')}</span></div>
+        <div class="info-row"><span class="info-label">Account Title:</span><span class="info-value">${escapeHtml(app.accountTitle || '—')}</span></div>
+        <div class="info-row"><span class="info-label">Account Number:</span><span class="info-value">${escapeHtml(app.accountNumber || '—')}</span></div>
+      </div>
+      
+      <div class="documents-section">
+        <h4>📎 Documents & Images</h4>
+        ${logoBase64 ? `
+          <div style="margin-bottom: 16px;">
+            <label style="font-weight:600;">Logo / Profile Image:</label><br>
+            <img src="${logoBase64}" class="image-preview" alt="Seller Logo" style="max-width:200px; max-height:200px;">
+          </div>
+        ` : '<p>No logo image available</p>'}
+        <div class="info-row"><span class="info-label">Status:</span><span class="info-value">
+          <span class="status-badge ${app.status === 'approved' ? 'status-approved' : (app.status === 'rejected' ? 'status-rejected' : 'status-pending')}">${app.status || 'pending'}</span>
+        </span></div>
+        <div class="info-row"><span class="info-label">Applied At:</span><span class="info-value">${app.appliedAt ? new Date(app.appliedAt).toLocaleString() : '—'}</span></div>
+      </div>
+      
+      <div class="modal-actions">
+        <button onclick="closeModal()" class="btn-outline">Close</button>
+      </div>
+    `;
+    
+    const modal = document.getElementById("appModal");
+    document.getElementById("modalContentInner").innerHTML = modalHtml;
+    modal.style.display = "flex";
+  };
+
+  // ======================== APPROVE APPLICATION ========================
+  window.approveApp = async (id) => {
+    if (!confirm("Approve this seller application?")) return;
+    try {
+      await db.collection(COLLECTION_NAME).doc(id).update({
+        status: "approved",
+        updatedAt: new Date().toISOString()
+      });
+      alert("✅ Application approved successfully!");
+      await loadApplications();
+    } catch (error) {
+      console.error("Approve error:", error);
+      alert("Approve failed: " + error.message);
+    }
+  };
+
+  // ======================== REJECT APPLICATION ========================
+  window.rejectApp = async (id) => {
+    if (!confirm("Reject this seller application?")) return;
+    try {
+      await db.collection(COLLECTION_NAME).doc(id).update({
+        status: "rejected",
+        updatedAt: new Date().toISOString()
+      });
+      alert("❌ Application rejected.");
+      await loadApplications();
+    } catch (error) {
+      console.error("Reject error:", error);
+      alert("Reject failed: " + error.message);
+    }
+  };
+
+  // ======================== DELETE APPLICATION ========================
+  window.deleteApp = async (id) => {
+    if (!confirm("⚠️ Permanently delete this application? This action cannot be undone.")) return;
+    try {
+      await db.collection(COLLECTION_NAME).doc(id).delete();
+      alert("🗑️ Application deleted.");
+      await loadApplications();
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Delete failed: " + error.message);
+    }
+  };
+
+  // ======================== MODAL CONTROLS ========================
+  window.closeModal = () => {
+    document.getElementById("appModal").style.display = "none";
+    currentEditId = null;
+  };
+  window.onclick = (event) => {
+    const modal = document.getElementById("appModal");
+    if (event.target === modal) closeModal();
+  };
+
+  // ======================== EXPORT FUNCTIONS ========================
+  window.downloadJSON = () => {
+    if (!allApps.length) { alert("No data to export"); return; }
+    const exportData = allApps.map(({ id, ...rest }) => rest);
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `seller_applications_${new Date().toISOString().slice(0,19)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  window.downloadCSV = () => {
+    if (!allApps.length) { alert("No data"); return; }
+    let csvRows = [["Roll Number", "Full Name", "CNIC", "Phone", "Platform", "Role", "Status", "City", "Applied At"]];
+    for (const a of allApps) {
+      csvRows.push([
+        `"${(a.rollNumber || "").replace(/"/g, '""')}"`,
+        `"${(a.documents?.fullName || a.authName || "").replace(/"/g, '""')}"`,
+        `"${(a.cnic || "").replace(/"/g, '""')}"`,
+        `"${(a.documents?.phone || a.accountNumber || "").replace(/"/g, '""')}"`,
+        `"${(a.platform || "").replace(/"/g, '""')}"`,
+        `"${(a.role || "dropshipper").replace(/"/g, '""')}"`,
+        `"${(a.status || "pending").replace(/"/g, '""')}"`,
+        `"${(a.city || "").replace(/"/g, '""')}"`,
+        a.appliedAt ? new Date(a.appliedAt).toLocaleDateString() : ""
+      ]);
+    }
+    const csvContent = csvRows.map(row => row.join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "seller_applications.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  window.downloadPDF = async () => {
+    if (!allApps.length) { alert("Nothing to export"); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    let y = 20;
+    doc.setFontSize(14);
+    doc.text("Seller Applications Report", 14, y);
+    y += 8;
+    doc.setFontSize(8);
+    for (let i = 0; i < Math.min(allApps.length, 50); i++) {
+      const a = allApps[i];
+      const line = `${i+1}. ${a.rollNumber || "N/A"} | ${a.documents?.fullName || a.authName || "—"} | ${a.platform || "—"} | ${a.status || "pending"}`;
+      doc.text(line, 14, y);
+      y += 5;
+      if (y > 190) { doc.addPage(); y = 20; }
+    }
+    doc.save(`seller_applications_${Date.now()}.pdf`);
+  };
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
+  }
+
+  console.log("Seller Applications Panel Ready — Collection: sellerApplications");
+</script>
+</body>
+</html>
