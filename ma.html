@@ -240,7 +240,7 @@
         <tr><th>Shop</th><th>Owner</th><th>Email</th><th>Status</th><th style="width:160px">Actions</th></tr>
       </thead>
       <tbody id="tableBody">
-        <tr><td colspan="5" style="text-align:center">🔁 Loading applications...</td></tr>
+        <td><td colspan="5" style="text-align:center">🔁 Loading applications...</td></tr>
       </tbody>
     </table>
   </div>
@@ -255,7 +255,6 @@
 
 <script>
   // ======================== FIREBASE CONFIGURATION ========================
-  // Your Firebase config (already provided)
   var firebaseConfig = {
     apiKey: "AIzaSyB44kAWSIrjWmYH75g16-J_Mnkip-HvNBM",
     authDomain: "ayshamall.firebaseapp.com",
@@ -264,6 +263,9 @@
     messagingSenderId: "319564197871",
     appId: "1:319564197871:web:d0de1f012835234494d01a"
   };
+  
+  // ✅ CORRECT COLLECTION NAME: merchantApplications (plural with 's')
+  const COLLECTION_NAME = "merchantApplications";
   
   // NO ADMIN EMAIL RESTRICTION — any authenticated user can access
 
@@ -313,7 +315,6 @@
     updateUserDisplay(user);
     
     if (user) {
-      // ✅ No email restriction - any authenticated user can access
       console.log("User authenticated:", user.email);
       await loadMerchantData();
     } else {
@@ -327,7 +328,8 @@
     const tbody = document.getElementById("tableBody");
     tbody.innerHTML = '<tr><td colspan="5">⏳ Fetching merchant applications...</td></tr>';
     try {
-      const snapshot = await db.collection("merchantApplications").get();
+      // Using the correct collection name: merchantApplications
+      const snapshot = await db.collection(COLLECTION_NAME).get();
       if (snapshot.empty) {
         tbody.innerHTML = '<tr><td colspan="5">📭 No merchant applications found.</td></tr>';
         allMerchants = [];
@@ -486,7 +488,7 @@
         platform: document.getElementById("edit_platform")?.value.trim() || "",
         otherDetails: document.getElementById("edit_otherDetails")?.value.trim() || ""
       };
-      await db.collection("merchantApplications").doc(id).update(updatedFields);
+      await db.collection(COLLECTION_NAME).doc(id).update(updatedFields);
       alert("✅ Merchant details updated successfully!");
       closeModal();
       await loadMerchantData();  // refresh table & allMerchants
@@ -499,7 +501,7 @@
   // ======================== APPROVE (status to approved) ========================
   window.approveApplication = async (id) => {
     try {
-      await db.collection("merchantApplications").doc(id).update({
+      await db.collection(COLLECTION_NAME).doc(id).update({
         status: "approved"
       });
       alert("✅ Application approved!");
@@ -514,7 +516,7 @@
   window.deleteApplication = async (id) => {
     if (!confirm("⚠️ Permanently delete this merchant application? This action cannot be undone.")) return;
     try {
-      await db.collection("merchantApplications").doc(id).delete();
+      await db.collection(COLLECTION_NAME).doc(id).delete();
       alert("🗑️ Record deleted.");
       await loadMerchantData();
     } catch (error) {
@@ -589,10 +591,7 @@
     doc.save(`merchants_${Date.now()}.pdf`);
   };
 
-  // Additional console safety: reload data if needed
-  window.refreshData = loadMerchantData;
-
-  console.log("Admin panel ready — any authenticated user can access (no email restriction)");
+  console.log("Admin panel ready — collection: " + COLLECTION_NAME + " | any authenticated user can access");
 </script>
 </body>
 </html>
